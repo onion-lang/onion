@@ -125,7 +125,7 @@ class ConfigLensSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, r.toString)
     }
 
-    it("hands a user-written lossless shape the text without the file's BOM, as read does (#3213)") {
+    it("hands a user-written lossless shape the text without the file's BOM, as read does, and render puts it back (#3213)") {
       val r = shell.run(
         """record P(name: String)
           |class NoRes conforms Residue { public: def this {} }
@@ -152,10 +152,14 @@ class ConfigLensSpec extends AbstractShellSpec {
           |    val dir = java.nio.file.Files::createTempDirectory("lens-spec").toString()
           |    val p = dir + "/name.txt"
           |    java.nio.file.Files::write(java.nio.file.Paths::get(p), ("\uFEFF" + "alice").getBytes("UTF-8"))
-          |    val a = file(p).readLossless(new NameShape()).get().value().name()
+          |    val r = file(p).readLossless(new NameShape()).get()
+          |    val a = r.value().name()
           |    val b = file(p).read(new NameShape()).get().name()
+          |    val raw = new String(java.nio.file.Files::readAllBytes(java.nio.file.Paths::get(p)), "UTF-8")
           |    if a != "alice" { return 1 }
           |    if a != b { return 2 }
+          |    if r.render() != raw { return 3 }
+          |    if r.edit { v -> new P("bob") }.render() != "\uFEFF" + "bob" { return 4 }
           |    return 0
           |  }
           |}

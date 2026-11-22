@@ -1,5 +1,5 @@
 ### Fixed
 
 - **`file(p).readLossless(shape)` hands a user-written shape the text without the file's BOM, as `read(shape)` does.**
-  - Before: a file `\uFEFFalice` gave `read` `alice` (5) but `readLossless` `\uFEFFalice` (6).
-  - Now: both give `alice`. A shape that keeps the mark in its residue says so with `keepsByteOrderMark()`; the built-in `config` shape does.
+  - Before: a file `﻿alice` gave `read` `alice` (5) but `readLossless` `﻿alice` (6).
+  - Now: both give `alice`, and `render()` writes the BOM back, so the file still round-trips byte for byte.

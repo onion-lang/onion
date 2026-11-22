@@ -565,16 +565,16 @@ value spellings). `printLossless(value, residue)` renders back through that resi
 unchanged parts reproduce byte for byte, and only deliberately changed values re-render.
 `Residue` is opaque; hand it back only to the shape that produced it.
 
-`file(p).readLossless(shape)` drops a leading byte order mark, as `read(shape)` does. A shape
-that must write the mark back overrides `keepsByteOrderMark()` to return `true`; the
-`config` shape does.
+`file(p).readLossless(shape)` gives the shape the text without a leading byte order mark
+(BOM), as `read(shape)` does. `render()` puts the mark back, so the round trip stays byte
+for byte for every lossless shape, yours included.
 
 `Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
 swaps the value while keeping the residue, and `edit { v -> ... }` focuses an update.
 `render()` reassembles the text:
 
 ```onion
-val r   = configShape.parseLossless(file"app.conf".text()).get()
+val r   = file"app.conf".readLossless(configShape).get()
 val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  one changed line
 ```

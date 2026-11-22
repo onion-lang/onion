@@ -170,9 +170,6 @@ public final class ConfigShape<T> implements Shape<T> {
     public boolean isLossless() { return true; }
 
     @Override
-    public boolean keepsByteOrderMark() { return true; }
-
-    @Override
     public Outcome<Lossless<T>> parseLossless(String text, Origin origin) {
         String source = origin == null ? "<input>" : origin.source();
         // A leading byte order mark is an encoding marker, not part of the first key; the

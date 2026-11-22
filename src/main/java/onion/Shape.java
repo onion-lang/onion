@@ -87,15 +87,6 @@ public interface Shape<T> {
     }
 
     /**
-     * Whether {@link #parseLossless} wants a file's leading byte order mark (U+FEFF) in its
-     * text, to keep in its residue and write back. {@code file(p).readLossless(shape)}
-     * strips the mark, as {@code read(shape)} does, unless this is true. Default: false.
-     */
-    default boolean keepsByteOrderMark() {
-        return false;
-    }
-
-    /**
      * Reads a value <em>and</em> the residue of everything around it, such that
      * {@code printLossless(r.value(), r.residue())} reproduces the input byte for byte.
      *

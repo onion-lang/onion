@@ -93,4 +93,22 @@ class ListLiteralNullPrimitiveSpec extends AbstractShellSpec {
       assert(errorCodes(src) == Seq.empty)
     }
   }
+
+  describe("a map literal with a null value and no expected type is a map of nullable (#3201)") {
+    it("is not accepted by a Map[String, Int] parameter") {
+      val src = "def t(m: Map[String, Int]): Int = m[\"b\"] + 1\nprintln(t([\"a\": 1, \"b\": null]))\n"
+      assert(errorCodes(src) == Seq("E0005"))
+    }
+    it("is not assignable to a Map[String, Int] through a val") {
+      assert(errorCodes("val ys = [\"a\": 1, \"b\": null]\nval m: Map[String, Int] = ys\nprintln(m)\n") == Seq("E0000"))
+    }
+    it("is accepted by a Map[String, Int?] parameter") {
+      val src = "def n(m: Map[String, Int?]): Int = m.size\nprintln(n([\"a\": 1, \"b\": null]))\n"
+      assert(errorCodes(src) == Seq.empty)
+    }
+    it("keeps a null-free map non-null") {
+      val src = "def t(m: Map[String, Int]): Int = m[\"a\"]\nprintln(t([\"a\": 1]))\n"
+      assert(errorCodes(src) == Seq.empty)
+    }
+  }
 }

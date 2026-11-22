@@ -859,8 +859,9 @@ IO::println(ys[0]?.length())    // 1, before and now
   once, as in the two `sort` rows above. The `!!` there never fails.
 - **A target type still works:** `val ys: List[Int?] = [1, null]`. `List[Int]` is rejected, as the `null` does not fit.
 - **Unchanged:** `[null]`, `[null, null]`, and a literal whose expected type is already known.
-- **Known remaining gap:** a map literal with a `null` value, such as `["a": "x", "b": null]`, still
-  infers a non-null value type. That is #3201, a separate change with its own migration row.
+- **Map literals too (#3201):** `["a": "x", "b": null]` with no expected type is a
+  `Map[String, String?]`. `t(["a": 1, "b": null])` with `t(m: Map[String, Int])` was
+  compiled and crashed at the read; it is now E0005. Take `Map[String, Int?]`, or drop the `null`.
 - **No `onion migrate` rule:** deciding what to do with a `null` (skip it, default it,
   reject it) depends on the program. The edits above show each choice.
 

@@ -518,6 +518,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def loadTopClass: Option[ClassType] = if (ownsTopClass) table_.load(topClass) else None
   /** Which unit's top-level code became each container class (`xMain`). */
   private[compiler] val topLevelContainerOwners = scala.collection.mutable.Map[String, AST.CompilationUnit]()
+  /** The file that declared each class, by name (full path, for E0008 notes). */
+  private[compiler] val classDeclaringFiles = scala.collection.mutable.Map[String, String]()
+  /** Container names a script lost to a user class (E0008 already reported; no cascades, #3060). */
+  private[compiler] val scriptOverClassNames = scala.collection.mutable.Set[String]()
   /** Units with top-level code whose container name another unit took (already E0008, #2690). */
   private[compiler] val duplicateScriptUnits =
     java.util.Collections.newSetFromMap(new java.util.IdentityHashMap[AST.CompilationUnit, java.lang.Boolean]())

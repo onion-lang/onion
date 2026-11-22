@@ -815,3 +815,27 @@ def raise(k: Int): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + k }
 - **表示されるもの:** `[E0107] old(...) は入口での値なので、ラムダ式の中には存在しません` と、上の書き換えを示すヒントです。
 - **今までどおり動くもの:** ラムダ式の外の `old(...)`、ラムダ式の `call` に引数として渡す `old(...)`、`old(...)` を使わない契約の中のラムダ式です。
 - **`onion migrate` の規則はありません:** 書き換えには、`old(...)` ごとに新しいラムダ式の引数と、その型と名前が必要です。ヒントに書き換えを示します。
+
+## 型引数の違う分岐が、期待される型で検査されるようになりました (#3241)
+
+同じ総称クラスで型引数だけが違う二つの分岐は、原型（raw: 型引数のないクラス）に合流します。
+以前は、原型の値がどの期待される型にも合っていました。
+現在は、`if`・`select`・`try` に型引数つきの期待される型があれば、各分岐をその型で検査します。
+
+```onion
+val other: Option[String] = Option::some("str")
+val tail: Option[Int] = Option::none()
+val c: Option[Int] = if b { other } else { tail }   // 以前: コンパイルできた。現在: `other` で E0000
+```
+
+| プログラム | 以前 | 現在 | コンパイルを通すには |
+|---|---|---|---|
+| `val c: Option[Int] = if b { other } else { tail }` | コンパイルでき、`c.get() + 1` が `ClassCastException` を投げた | E0000 | 分岐を期待される型にそろえるか、`Object` のような広い型にする |
+| `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | コンパイルできた | E0000 | 同上 |
+
+- **表示されるもの:** E0000（`type Option[Int] is expected, but type Option[String] is used`）です。
+  キャレットは型の合わない分岐を指します。
+- **今までどおり動くもの:** 期待される型に合う分岐、`Object` のような期待される型、
+  期待される型のない合流です（`val c = if b { other } else { tail }` は今も原型の `Option` です）。
+- **`onion migrate` の規則はありません:** プログラムが間違った型の値を持っています。
+  どの分岐が間違いかは書いた人にしか分かりません。エラーがその分岐を指します。

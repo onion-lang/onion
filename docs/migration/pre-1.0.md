@@ -939,3 +939,27 @@ def raise(k: Int): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + k }
   and lambdas in a contract that do not use `old(...)`.
 - **No `onion migrate` rule:** the rewrite needs a new lambda parameter for each `old(...)`,
   and its type and name. The hint shows the edit.
+
+## Branches with other type arguments are checked against the target (#3241)
+
+Two branches of one generic class with different type arguments join as the raw class,
+and a raw value used to fit any target. Now, when the `if`, `select` or `try` has an
+applied target type, each branch is checked against it.
+
+```onion
+val other: Option[String] = Option::some("str")
+val tail: Option[Int] = Option::none()
+val c: Option[Int] = if b { other } else { tail }   // Before: compiled. Now: E0000 at `other`
+```
+
+| Program | Before | Now | To keep it compiling |
+|---|---|---|---|
+| `val c: Option[Int] = if b { other } else { tail }` | compiled; `c.get() + 1` threw `ClassCastException` | E0000 | give the branch the target's type, or use a wider target such as `Object` |
+| `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | compiled | E0000 | the same |
+
+- **What you see:** E0000 (`type Option[Int] is expected, but type Option[String] is used`),
+  with the caret at the branch that does not fit.
+- **Unchanged:** branches that fit the target, a target such as `Object`, and a join with
+  no target (`val c = if b { other } else { tail }` is still a raw `Option`).
+- **No `onion migrate` rule:** the program holds a value of the wrong type, and only you
+  know which branch is wrong. The error points at it.

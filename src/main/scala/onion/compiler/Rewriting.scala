@@ -316,6 +316,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         throw new CompilationException(Seq(CompileError("", declaration.location,
           Message("error.semantic.homogeneousEnumWithTypeParameters", Array[Any](declaration.name)),
           Some(HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS.errorCode))))
+      case declaration: AST.EnumDeclaration =>
+        // A homogeneous enum's constant arguments, parameter defaults and methods are
+        // expressions like a class's; without this, `do[M]` in them reached typing raw (#3063).
+        newToplevels += rewriteEnumDeclaration(declaration)
+      case declaration: AST.ExtensionDeclaration =>
+        newToplevels += declaration.copy(methods = declaration.methods.map(rewriteMethodDeclaration))
       case element: AST.BlockElement =>
         // Top-level statements need desugaring too (do-notation et al.);
         // they previously passed through untouched, so a DoExpression
@@ -788,6 +794,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       val newSections = declaration.sections.map(rewriteAccessSection)
       declaration.copy(defaultSection = newDefaultSection, sections = newSections)
     }
+
+  private def rewriteEnumDeclaration(declaration: AST.EnumDeclaration): AST.EnumDeclaration = {
+    val newConstants = declaration.constants.map(c => c.copy(args = c.args.map(rewriteExpression)))
+    declaration.copy(params = rewriteDefaults(declaration.params), constants = newConstants,
+      sections = declaration.sections.map(rewriteAccessSection))
+  }
 
   def rewriteInterfaceDeclaration(declaration: AST.InterfaceDeclaration): InterfaceDeclaration = {
     val newMethods = declaration.methods.map(rewriteMethodDeclaration)

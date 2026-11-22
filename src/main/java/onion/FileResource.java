@@ -65,10 +65,14 @@ public final class FileResource {
             // Byte-faithful on purpose: readText() reassembles lines through the
             // platform separator and drops a trailing newline, either of which would
             // silently break L2. A lossless read must see the file as it is.
-            // A leading BOM is left for the shape to keep in its residue (#3035).
+            // A leading BOM is dropped, as read(shape) does, unless the shape keeps it in
+            // its residue to write the file back as it was (#3035, #3213).
             String text = new String(
                 java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
                 java.nio.charset.StandardCharsets.UTF_8);
+            if (!shape.keepsByteOrderMark() && !text.isEmpty() && text.charAt(0) == '\uFEFF') {
+                text = text.substring(1);
+            }
             return shape.parseLossless(text, Origin.atLine(path, 1));
         } catch (Exception e) {
             return Outcome.bad(Defect.at(Origin.atLine(path, 1), "", "a readable file", describe(e)));

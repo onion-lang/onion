@@ -125,6 +125,44 @@ class ConfigLensSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, r.toString)
     }
 
+    it("hands a user-written lossless shape the text without the file's BOM, as read does (#3213)") {
+      val r = shell.run(
+        """record P(name: String)
+          |class NoRes conforms Residue { public: def this {} }
+          |class NameShape conforms Shape[P] {
+          |public:
+          |  def this {}
+          |  def parse(text: String, origin: Origin): Outcome[P] = Outcome::ok(new P(text))
+          |  def canPrint(): Boolean = true
+          |  def print(v: P): String = v.name()
+          |  def describe(): String = "name"
+          |  def isLossless(): Boolean = true
+          |  def parseLossless(text: String, origin: Origin): Outcome[Lossless[P]] = Outcome::ok(new Lossless[P](new P(text), new NoRes(), this))
+          |  def printLossless(v: P, r: Residue): String = v.name()
+          |}
+          |def l1(): Boolean
+          |  ensures result
+          |{
+          |  val s = new NameShape()
+          |  return s.parse(s.print(new P("x"))).get() == new P("x")
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val dir = java.nio.file.Files::createTempDirectory("lens-spec").toString()
+          |    val p = dir + "/name.txt"
+          |    java.nio.file.Files::write(java.nio.file.Paths::get(p), ("\uFEFF" + "alice").getBytes("UTF-8"))
+          |    val a = file(p).readLossless(new NameShape()).get().value().name()
+          |    val b = file(p).read(new NameShape()).get().name()
+          |    if a != "alice" { return 1 }
+          |    if a != b { return 2 }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(0) == r, r.toString)
+    }
+
     it("reports an unreadable file as a defect, not an exception") {
       val r = shell.run(decl +
         """class Test {

@@ -565,6 +565,10 @@ value spellings). `printLossless(value, residue)` renders back through that resi
 unchanged parts reproduce byte for byte, and only deliberately changed values re-render.
 `Residue` is opaque; hand it back only to the shape that produced it.
 
+`file(p).readLossless(shape)` drops a leading byte order mark, as `read(shape)` does. A shape
+that must write the mark back overrides `keepsByteOrderMark()` to return `true`; the
+`config` shape does.
+
 `Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
 swaps the value while keeping the residue, and `edit { v -> ... }` focuses an update.
 `render()` reassembles the text:

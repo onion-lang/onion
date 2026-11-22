@@ -312,10 +312,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case Array(staticMethod) =>
         val classSubst = TypeSubstitution.classSubstitution(containerClass)
         calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
+          // Defaults are filled before the dictionaries are injected, so a `[T: Trait]`
+          // method's trailing dictionary slots line up with its formals (#3223).
+          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs).map(withDefaults(staticMethod, _)),
           // finalParams(0) is the processed receiver; drop it — codegen handles
           // the receiver from node.target (null-check + optional unbox)
-          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, withDefaults(staticMethod, finalParams).tail)
+          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, finalParams.tail)
         )
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
@@ -421,8 +423,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case Array(staticMethod) =>
         val classSubst = TypeSubstitution.classSubstitution(containerClass)
         calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
-          finalParams => new CallStatic(containerClass, staticMethod, withDefaults(staticMethod, finalParams))
+          // Defaults first, then the dictionaries (#3223): injected into a short argument
+          // list, a dictionary overwrote the last real argument and kept its null default.
+          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs).map(withDefaults(staticMethod, _)),
+          finalParams => new CallStatic(containerClass, staticMethod, finalParams)
         )
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)

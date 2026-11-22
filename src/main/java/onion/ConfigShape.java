@@ -12,7 +12,9 @@ import java.util.Set;
  *
  * <p>The format, deliberately small: one entry per line as {@code key = value} (the
  * first {@code =} splits; spacing around it is free), {@code #}-lines are comments,
- * blank lines are blank lines. A value runs to the end of the line.
+ * blank lines are blank lines. A value runs to the end of the line, except that
+ * whitespace followed by {@code #} starts a trailing comment (#3165); quote a value that
+ * needs {@code " #"}.
  *
  * <p>As a plain {@link Shape} it behaves like the JSON/YAML document shapes: components
  * are matched to keys by name, a missing key or an unconvertible value is a positioned
@@ -225,7 +227,7 @@ public final class ConfigShape<T> implements Shape<T> {
             }
             entryLines.put(name, at);
             Origin lineOrigin = Origin.atLine(source, at + 1);
-            Outcome<String> spelled = valueForRead(baseTag, lines.get(at).valueRaw, lineOrigin, name);
+            Outcome<String> spelled = valueForRead(baseTag, withoutComment(lines.get(at).valueRaw), lineOrigin, name);
             if (spelled.isBad()) {
                 defects.addAll(spelled.defects());
                 values.add(null);
@@ -336,6 +338,12 @@ public final class ConfigShape<T> implements Shape<T> {
             if (replacement == null) sb.append(line.raw);
             else {
                 sb.append(line.prefix).append(replacement);
+                // A trailing `# comment` belongs to the line, not the value: keep it (#3165).
+                int cm = commentAt(line.valueRaw);
+                if (cm >= 0) {
+                    String tail = line.valueRaw.substring(cm);
+                    sb.append(tail.endsWith("\r") ? tail.substring(0, tail.length() - 1) : tail);
+                }
                 // A CRLF document's lines keep their \r inside valueRaw; an edited
                 // line must keep its terminator style too.
                 if (line.valueRaw.endsWith("\r")) sb.append('\r');
@@ -382,7 +390,39 @@ public final class ConfigShape<T> implements Shape<T> {
      * quoting convention on the next parse.
      */
     private static boolean needsQuoting(String s) {
-        return !s.equals(s.trim()) || s.startsWith("\"");
+        return !s.equals(s.trim()) || s.startsWith("\"") || s.contains(" #") || s.contains("\t#");
+    }
+
+    /**
+     * Where a trailing comment starts in a value slot, or -1: the first whitespace run that
+     * is followed by {@code #}, outside a double-quoted value (#3165). A {@code #} glued to
+     * the value ({@code a#b}) or opening it ({@code #tag}) is value text.
+     */
+    private static int commentAt(String v) {
+        int i = 0;
+        while (i < v.length() && (v.charAt(i) == ' ' || v.charAt(i) == '\t')) i++;
+        if (i < v.length() && v.charAt(i) == '"') {
+            for (i++; i < v.length(); i++) {
+                char c = v.charAt(i);
+                if (c == '\\' && i + 1 < v.length()) i++;
+                else if (c == '"') { i++; break; }
+            }
+        }
+        for (; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c != ' ' && c != '\t') continue;
+            int j = i;
+            while (j < v.length() && (v.charAt(j) == ' ' || v.charAt(j) == '\t')) j++;
+            if (j < v.length() && v.charAt(j) == '#') return i;
+            i = j - 1;
+        }
+        return -1;
+    }
+
+    /** The value slot without its trailing comment. */
+    private static String withoutComment(String v) {
+        int at = commentAt(v);
+        return at < 0 ? v : v.substring(0, at);
     }
 
     private static String escapeQuoted(String s) {

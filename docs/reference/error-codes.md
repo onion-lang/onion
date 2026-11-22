@@ -1160,6 +1160,13 @@ public:
 
 Fix: use the plain value in a `requires`, or move the condition to an `ensures`.
 
+Inside a lambda, `old(...)` is E0107 even in an `ensures` or a `history`: the method keeps the
+value on entry, and a lambda runs on its own. Pass the value in as an argument instead:
+
+```onion
+def f(): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + 1 }
+```
+
 ### `E0108` — a `history` that is not a preorder
 
 A `history` relates two states of one object. It must be reflexive (`h(a, a)` holds) and

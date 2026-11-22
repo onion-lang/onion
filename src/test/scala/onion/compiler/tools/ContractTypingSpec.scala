@@ -103,6 +103,32 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(shown.contains(".call(old(n))"), shown)
     }
 
+    it("builds the E0107 lambda hint from the argument and its type (#3240)") {
+      val src = "class A {\n  var total: Long\npublic:\n  def f(): void ensures ((x: Long) -> x >= old(total)).call(total) { total = total + 1L }\n}"
+      val shown = compile(src, ContractMode.Check).filter(_.message.contains("old(")).map(_.message).mkString("\n")
+      assert(codes(src).contains("E0107"), codes(src).toString)
+      assert(shown.contains("((o: Long) -> ...).call(old(total))"), shown)
+      // It is already inside an `ensures`; the message must not send the user there.
+      assert(!shown.contains("`ensures` or a `history`"), shown)
+      assert(!shown.contains("`ensures` か `history`"), shown)
+    }
+
+    it("shows an indexed argument as written in the E0107 lambda hint (#3240)") {
+      val src = "class A {\n  var xs: Int[]\npublic:\n  def f(): void ensures ((x: Int) -> x >= old(xs[0])).call(xs[0]) { xs[0] = xs[0] + 1 }\n}"
+      val shown = compile(src, ContractMode.Check).filter(_.message.contains("old(")).map(_.message).mkString("\n")
+      assert(codes(src).contains("E0107"), codes(src).toString)
+      assert(shown.contains("((o: Int) -> ...).call(old(xs[0]))"), shown)
+    }
+
+    it("marks the E0107 lambda hint as an example when the argument cannot be shown (#3240)") {
+      val src = "class A {\n  var s: String\npublic:\n  def f(): void ensures ((x: Int) -> x >= old(s.length())).call(s.length()) { s = s + \"!\" }\n}"
+      val shown = compile(src, ContractMode.Check).filter(_.message.contains("old(")).map(_.message).mkString("\n")
+      assert(codes(src).contains("E0107"), codes(src).toString)
+      // Locale-agnostic: the example's code, and no attempt to render `s.length()`.
+      assert(shown.contains("`((o: Int) -> n >= o).call(old(n))`"), shown)
+      assert(!shown.contains("old(...))"), shown)
+    }
+
     it("runs old() passed into a lambda as an argument, the edit E0107 suggests (#2732)") {
       val src = "class A {\n  var n: Int\npublic:\n  def this { n = 1 }\n  def f(): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + 1 }\n}"
       assert(codes(src).isEmpty, codes(src).toString)

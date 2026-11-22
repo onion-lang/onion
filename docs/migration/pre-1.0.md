@@ -933,8 +933,8 @@ def raise(k: Int): void ensures ((x: Int) -> x >= old(n)).call(n) { n = n + k }
 def raise(k: Int): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + k }
 ```
 
-- **What you see:** `[E0107] old(...) is the value on entry, so there is none in a lambda`,
-  followed by the hint above.
+- **What you see:** `[E0107] old(...) cannot be used inside a lambda`, then a hint built
+  from your argument and its type, such as `((o: Int) -> ...).call(old(n))`.
 - **Unchanged:** `old(...)` outside a lambda, `old(...)` as an argument to a lambda's `call`,
   and lambdas in a contract that do not use `old(...)`.
 - **No `onion migrate` rule:** the rewrite needs a new lambda parameter for each `old(...)`,

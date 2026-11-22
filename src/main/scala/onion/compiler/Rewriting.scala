@@ -896,7 +896,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     * stay in sync with MethodInvocationBuilderSupport.instanceClassName. */
   private def mangleInstanceClassName(applied: AST.TypeDescriptor): String = applied match {
     case AST.PrimitiveType(k) => boxedPrimitiveName(k)
-    case AST.ReferenceType(n, _) => val i = n.lastIndexOf('.'); if (i >= 0) n.substring(i + 1) else n
+    case AST.ReferenceType(n, _) =>
+      // An import alias (`import { lib.Sh as S }`) names the same trait or type, so it mangles
+      // to the real name, which is what call-site resolution sees (#2990).
+      val real = currentImports.collectFirst { case (alias, q) if alias == n => q }.getOrElse(n)
+      val i = real.lastIndexOf('.'); if (i >= 0) real.substring(i + 1) else real
     case AST.ParameterizedType(c, ps) => mangleInstanceClassName(c) + "$$" + ps.map(mangleInstanceClassName).mkString("$")
     case AST.ArrayType(c) => mangleInstanceClassName(c) + "Array"
     case AST.NullableType(i) => mangleInstanceClassName(i)

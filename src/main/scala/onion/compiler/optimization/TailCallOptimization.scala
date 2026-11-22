@@ -129,7 +129,8 @@ class TailCallOptimization(config: CompilerConfig)
    */
   private def isOptimizable(method: MethodDefinition): Boolean = {
     val m = method.modifier
-    (m & AST.M_PRIVATE) != 0 || (m & AST.M_STATIC) != 0 || (m & AST.M_FINAL) != 0
+    (m & AST.M_PRIVATE) != 0 || (m & AST.M_STATIC) != 0 || (m & AST.M_FINAL) != 0 ||
+      TailCallOptimization.ownerCannotBeExtended(method)
   }
 
   private def containsTailCall(stmts: Seq[ActionStatement], method: MethodDefinition): Boolean = {
@@ -797,4 +798,13 @@ class TailCallOptimization(config: CompilerConfig)
     // Return a block with all assignments and continue
     Some(new StatementBlock(null, assignments.toSeq: _*))
   }
+}
+
+object TailCallOptimization {
+  /** A method of a `final` class or a record has no subclass to override it (#3256). */
+  def ownerCannotBeExtended(method: TypedAST.MethodDefinition): Boolean =
+    method.classType match {
+      case c: TypedAST.ClassDefinition => c.isRecord || (c.modifier & AST.M_FINAL) != 0
+      case _ => false
+    }
 }

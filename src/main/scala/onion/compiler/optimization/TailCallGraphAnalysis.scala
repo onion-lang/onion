@@ -54,21 +54,7 @@ private[optimization] object TailCallGraphAnalysis {
           bareCall(bare).foreach(calls += _)
 
         case ret: Return if ret.term != null =>
-          ret.term match {
-            case call: Call =>
-              call.method match {
-                case targetMethod: MethodDefinition =>
-                  calls += targetMethod
-                case _ =>
-              }
-            case call: CallStatic =>
-              call.method match {
-                case targetMethod: MethodDefinition =>
-                  calls += targetMethod
-                case _ =>
-              }
-            case _ =>
-          }
+          groupCall(ret.term).foreach { case (targetMethod, _) => calls += targetMethod }
 
         case block: StatementBlock =>
           visitStatements(block.statements.toSeq, tail)
@@ -95,12 +81,21 @@ private[optimization] object TailCallGraphAnalysis {
    * method it calls, when the statement is one (#3131).
    */
   def bareCall(stmt: ActionStatement): Option[MethodDefinition] = stmt match {
-    case e: ExpressionActionStatement =>
-      e.term match {
-        case c: Call       => c.method match { case m: MethodDefinition => Some(m); case _ => None }
-        case c: CallStatic => c.method match { case m: MethodDefinition => Some(m); case _ => None }
-        case _             => None
-      }
+    case e: ExpressionActionStatement => groupCall(e.term).map(_._1)
+    case _                            => None
+  }
+
+  /**
+   * A call that can become a jump inside the group: a static call, or an instance call
+   * whose receiver is `this`. The merged loop runs on `this`, so a call through another
+   * object (`mk().b(n)`) would drop the receiver, its side effects and its null check
+   * (#3251). Returns the callee and the arguments.
+   */
+  def groupCall(term: Term): Option[(MethodDefinition, Array[Term])] = term match {
+    case c: Call if c.target.isInstanceOf[This] =>
+      c.method match { case m: MethodDefinition => Some((m, c.parameters)); case _ => None }
+    case c: CallStatic =>
+      c.method match { case m: MethodDefinition => Some((m, c.parameters)); case _ => None }
     case _ => None
   }
 

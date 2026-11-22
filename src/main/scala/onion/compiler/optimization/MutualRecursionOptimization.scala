@@ -745,7 +745,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     val isVoid = returnType eq BasicType.VOID
 
-    def transitionFor(call: Term, target: MethodDefinition, params: Array[Term]): Option[ActionStatement] =
+    def transitionFor(target: MethodDefinition, params: Array[Term]): Option[ActionStatement] =
       stateIdOf(target).filterNot(_ => params.exists(_.isInstanceOf[DefaultArgument])).map { id =>
         transformTailCallToStateTransition(params, id, loopVarOffset, stateLoopVarIndex, params.map(_.`type`))
       }
@@ -755,52 +755,20 @@ class MutualRecursionOptimization(config: CompilerConfig)
     def transformStatement(stmt: ActionStatement, tail: Boolean): ActionStatement = {
       stmt match {
         case bare: ExpressionActionStatement if isVoid && tail && TailCallGraphAnalysis.bareCall(bare).isDefined =>
-          val transition = bare.term match {
-            case call: Call       => transitionFor(call, call.method.asInstanceOf[MethodDefinition], call.parameters)
-            case call: CallStatic => transitionFor(call, call.method.asInstanceOf[MethodDefinition], call.parameters)
-            case _                => None
-          }
-          transition.getOrElse(stmt)
+          TailCallGraphAnalysis.groupCall(bare.term)
+            .flatMap { case (target, params) => transitionFor(target, params) }
+            .getOrElse(stmt)
 
         case ret: Return if ret.term != null =>
-          // Check if this is a tail call to another method in the group
-          ret.term match {
-            case call: Call =>
-              call.method match {
-                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined && !call.parameters.exists(_.isInstanceOf[DefaultArgument]) =>
-                  // Transform to: update params, set state, continue
-                  if (config.verbose) {
-                    trace(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
-                  }
-                  transformTailCallToStateTransition(
-                    call.parameters,
-                    stateIdOf(targetMethod).get,
-                    loopVarOffset,
-                    stateLoopVarIndex,
-                    call.parameters.map(_.`type`)
-                  )
-                case _ =>
-                  ret
+          // A tail call to another member of the group becomes a state transition.
+          TailCallGraphAnalysis.groupCall(ret.term)
+            .flatMap { case (target, params) =>
+              transitionFor(target, params).map { t =>
+                if (config.verbose) trace(s"[Mutual TCO]       Found tail call: ${target.name} -> state ${stateIdOf(target).get}")
+                t
               }
-            case call: CallStatic =>
-              call.method match {
-                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined && !call.parameters.exists(_.isInstanceOf[DefaultArgument]) =>
-                  if (config.verbose) {
-                    trace(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
-                  }
-                  transformTailCallToStateTransition(
-                    call.parameters,
-                    stateIdOf(targetMethod).get,
-                    loopVarOffset,
-                    stateLoopVarIndex,
-                    call.parameters.map(_.`type`)
-                  )
-                case _ =>
-                  ret
-              }
-            case _ =>
-              ret
-          }
+            }
+            .getOrElse(ret)
 
         case block: StatementBlock =>
           val transformed = transformStatementsInBlock(block.statements.toSeq, tail)

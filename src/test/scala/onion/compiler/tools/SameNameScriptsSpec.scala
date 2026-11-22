@@ -50,6 +50,18 @@ class SameNameScriptsSpec extends AnyFunSpec {
       val codes = compile("d1/x.on" -> "println(\"one\")", "d2/x.on" -> "println(\"two\")")
       assert(codes == Seq("E0008"), codes)
     }
+    it("words the note through the message bundles, in Japanese too (#3060)") {
+      val key = "error.semantic.duplicatedClass.sameNameScripts"
+      val en = onion.compiler.MessageBundles.english.getString(key)
+      val ja = onion.compiler.MessageBundles.japanese.getString(key)
+      assert(en != ja, "the Japanese note is the English one")
+      assert(!ja.exists(_ < ' ') && ja.contains("{0}") && ja.contains("{1}"), ja)
+      val message = compileDetailed("d1/x.on" -> "println(\"one\")", "d2/x.on" -> "println(\"two\")")
+        .allErrors.map(_.message).mkString("\n")
+      val expectedNote = java.text.MessageFormat.format(
+        onion.compiler.toolbox.Message(key), "d2/x.on", "d1/x.on")
+      assert(message.contains(expectedNote), message)
+    }
     it("still compiles scripts with different names") {
       assert(compile("a.on" -> "println(\"one\")", "b.on" -> "println(\"two\")").isEmpty)
     }

@@ -989,7 +989,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     typeRef
   }
 
-  private def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]): Unit = {
+  private def constructTypeHierarchy(start: ClassType, visit: MutableSet[ClassType]): Unit = {
+    // `I[String]` and `I[List[String]]` are different applied types of one class. Walk the
+    // raw class, or `interface I[T] conforms I[List[T]]` never reaches a visited node.
+    val node = start match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
     if (node == null || visit.contains(node)) return
     visit += node
     node match {

@@ -67,5 +67,52 @@ class LambdaEarlyReturnTargetSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("Some[value=7] None[]") == result)
     }
+
+    it("the last expression is a variable or a field access (#3234)") {
+      val variable = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val tail: Option[Int] = Option::none()
+          |val c: Option[Int] = ch2(() -> {
+          |  if 1 < 2 { return Option::some("str") }
+          |  tail
+          |})
+          |def main(args: String[]): String = "" + (c.get() + 1)
+          |""".stripMargin,
+        "EarlyReturnVariableTail.on"
+      )
+      assert(Shell.Failure(-1) == variable)
+      val local = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val c: List[Int] = ch2(() -> {
+          |  val xs: List[Int] = [1]
+          |  if 1 < 2 { return ["s"] }
+          |  xs
+          |})
+          |def main(args: String[]): String = "" + (c[0] + 1)
+          |""".stripMargin,
+        "EarlyReturnLocalTail.on"
+      )
+      assert(Shell.Failure(-1) == local)
+    }
+
+    it("well-typed early returns with a variable tail still compile and run (#3234)") {
+      val result = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val none: Option[Int] = Option::none()
+          |def pick(b: Boolean): Option[Int] = ch2(() -> {
+          |  if b { return Option::some(7) }
+          |  none
+          |})
+          |def widen(b: Boolean): Object = ch2(() -> {
+          |  if b { return 1 }
+          |  val s = "x"
+          |  s
+          |})
+          |def main(args: String[]): String = "" + pick(true) + " " + pick(false) + " " + widen(true) + widen(false)
+          |""".stripMargin,
+        "EarlyReturnVariableOk.on"
+      )
+      assert(Shell.Success("Some[value=7] None[] 1x") == result)
+    }
   }
 }

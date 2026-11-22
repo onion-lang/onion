@@ -255,7 +255,10 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
 
   /**
    * A lambda that declares its parameter types (or has none) and no result type,
-   * whose result is malleable (a generic call or a collection literal).
+   * whose result is malleable (a generic call or a collection literal), or that has
+   * an explicit `return`: its results join to a raw type (`Option[String]` and
+   * `Option[Int]` -> `Option`) that fits the target whatever the last expression is,
+   * so only the re-type checks each `return` against the target (#3234).
    */
   private def isTargetTypedClosure(expr: AST.Expression): Boolean = {
     val closure = expr match {
@@ -264,11 +267,11 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
       case _ => return false
     }
     closure.returns == null && closure.args.forall(_.typeRef != null) &&
-      closure.body != null && closure.body.elements.nonEmpty && (closure.body.elements.last match {
+      closure.body != null && closure.body.elements.nonEmpty && ((closure.body.elements.last match {
         case AST.ReturnExpression(_, result) => result != null && isMalleable(result)
         case e: AST.Expression => isMalleable(e)
         case _ => false
-      })
+      }) || ReturnNodeDetector.containsReturn(closure.body))
   }
 
   /** A single method (by name) whose arity accepts `argCount` arguments, else None. */

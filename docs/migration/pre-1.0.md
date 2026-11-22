@@ -966,3 +966,29 @@ val c: Option[Int] = x                 // Before: compiled. Now: E0000
   generic parameter, E0000 now points at the call, not the branch.
 - **Unchanged:** a target such as `Object`, calling a method on the join, and branches that fit.
 - **No `onion migrate` rule:** the value had the wrong type, and only you know which branch to fix.
+## A named call above its callee binds by name, as a call below it does (#3110)
+
+A call with named arguments can now reach a function or method declared later in the file.
+Before, a later overload had no parameter names yet, so it dropped out of named-argument
+resolution, or matched placeholder names. A named call above a set of overloads now picks
+the overload a call below them picks.
+
+```onion
+def a(): Int = f(x = 1)
+def f(x: Int): Int = 100
+def f(x: Long, y: Int = 2): Int = 200
+println(a())   // Before: 200. Now: 100, as when a() is declared below f
+```
+
+| Callee (declared below the call) | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `f(x: Int)`, `f(x: Long, y: Int = 2)` | `f(x = 1)` | `200` | `100` | `f(x = 1L)` |
+| `f(x: Int)`, `f(x: Int, y: Int = 2)` | `f(x = 1)` | `200` | E0006 | `f(x = 1, y = 2)` |
+| `b(x: Int, y: Int)` | `b(arg0 = 1, arg1 = 2)` | `12` | E0043 | `b(x = 1, y = 2)` |
+
+- **What you see:** a different overload runs with no message, **E0006**
+  `method call is applicable for both …`, or **E0043**
+  `unknown parameter name: arg0`.
+- **Still fine:** a named call below its callee, and a call with positional arguments only.
+- **No `onion migrate` rule:** the silent case is found only by resolving the call the old
+  way, and only you know which overload you meant. The table shows each edit.

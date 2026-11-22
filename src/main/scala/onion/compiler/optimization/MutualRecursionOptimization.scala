@@ -117,6 +117,16 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Find strongly connected components (mutual recursion groups)
     val mutualGroups = findMutualRecursionGroups(annotatedMethods, callGraph)
 
+    // A lone method that still tail-calls itself was not turned into a loop by
+    // TailCallOptimization (overridable, or a shape it does not rewrite): the
+    // annotation asked for stack safety and did not get it (#3032).
+    annotatedMethods.foreach { method =>
+      val inGroup = mutualGroups.exists(g => g.size > 1 && g.exists(_ eq method))
+      if (!inGroup && callGraph.getOrElse(method, Set.empty).exists(_ eq method)) {
+        reportLoneIneffective(classDef, method)
+      }
+    }
+
     if (mutualGroups.isEmpty) {
       return classDef // No mutual recursion detected
     }
@@ -278,6 +288,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
         s"deep recursion between these methods can still overflow the JVM stack"
       warnings += CompileWarning(sourceFile, method.location, WarningCategory.IneffectiveTailRecursive, message)
     }
+  }
+
+  private def reportLoneIneffective(classDef: ClassDefinition, method: MethodDefinition): Unit = {
+    val sourceFile = Option(classDef.getSourceFile).getOrElse("")
+    val m = method.modifier
+    val overridable = (m & AST.M_PRIVATE) == 0 && (m & AST.M_STATIC) == 0 && (m & AST.M_FINAL) == 0
+    val reason =
+      if (overridable) "it can be overridden; make it private, static or final"
+      else "its self-call is in a form that cannot be rewritten into a loop"
+    val message = s"method '${method.name}' is annotated @TailRecursive but could not be turned into a loop: " +
+      s"$reason; deep recursion can still overflow the JVM stack"
+    warnings += CompileWarning(sourceFile, method.location, WarningCategory.IneffectiveTailRecursive, message)
   }
 
   /**

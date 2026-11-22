@@ -158,13 +158,9 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(result.diagnostics.warnings.filter(_.category.code == "W0015").isEmpty)
     }
 
-    it("warns for List::fold's accumulator even when every argument is a non-null Int") {
-      // onion.Colls::fold<T, R> is a Java generic method: its declared return
-      // type is the type variable R, a boxed reference with no Onion-tracked
-      // nullability, regardless of what the call site's own arguments pin R
-      // to. So the single most idiomatic numeric fold -- a literal `0` zero
-      // and an Int-returning combiner -- still unboxes through this warning
-      // (see docs/reference/stdlib.md's Colls Module section).
+    it("does not warn for List::fold's accumulator when every argument is a non-null Int (#3209)") {
+      // onion.Colls::fold<T, R> returns the type variable R, but R is seeded by
+      // the literal `0`, so the running total is never null.
       val result = compileWarnings(
         """
           |class Test {
@@ -178,10 +174,10 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
           |""".stripMargin)
       assert(!result.hasErrors)
       val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
-      assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
     }
 
-    it("warns for List::reduce's 3-arg accumulator the same way, despite its concretely-typed signature") {
+    it("does not warn for List::reduce's 3-arg accumulator seeded by a non-null Int (#3209)") {
       val result = compileWarnings(
         """
           |class Test {
@@ -195,7 +191,7 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
           |""".stripMargin)
       assert(!result.hasErrors)
       val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
-      assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
     }
 
     it("names the source file even when it is the very first warning of the compilation (#2238)") {
@@ -208,6 +204,74 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
       assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
       assert(w15.head.sourceFile == "W.on", s"expected sourceFile 'W.on', got '${w15.head.sourceFile}'")
+    }
+
+    it("does not warn when fold starts from a non-null primitive and the lambda returns one (#3209)") {
+      val result = compileWarnings(
+        """
+          |val xs: List[Int] = [1, 2, 3]
+          |val total: Int = xs.fold(0) { acc, x -> acc + x }
+          |val avg: Double = [1.5, 2.5].fold(0.0) { acc, x -> acc + x }
+          |val big: Long = xs.fold(0L) { acc, x -> acc + x }
+          |println(total)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
+    it("still warns when a fold lambda can return null (#3209)") {
+      val result = compileWarnings(
+        """
+          |val xs: List[Int] = [1, 2, 3]
+          |val a: Int = xs.fold(0) { acc, x -> null }
+          |println(a)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val codes = result.diagnostics.warnings.map(_.category.code)
+      assert(codes.contains("W0012"), s"expected W0012 for the null return, got $codes")
+    }
+
+    it("does not warn when the fold lambda returns its accumulator or a branch of it (#3209)") {
+      val result = compileWarnings(
+        """
+          |val xs: List[String] = ["a", "b"]
+          |val n: Int = xs.fold(0) { acc, k -> if k == "a" { acc } else { acc + 1 } }
+          |val m: Int = Iterables::foldl(xs, 0, (acc, k) -> acc + k.length())
+          |println(n + m)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
+    it("still warns when the fold lambda returns a platform value that can be null (#3209 block)") {
+      val result = compileWarnings(
+        """
+          |import { java.util.* }
+          |val m: Map[String, Int] = ["a": 1]
+          |val xs: List[String] = ["a", "zz"]
+          |val t: Int = xs.fold(0) { acc, k -> m.get(k) }
+          |val r: Int = xs.reduce(0) { acc, k -> m.get(k) }
+          |val j: Int = Iterables::foldl(xs, 0, (acc, k) -> Json::getInt(Json::parse("{}"), "zz"))
+          |println(t + r + j)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 3, s"expected 3 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+    }
+
+    it("still warns for a generic static whose result can come from a container (#3209 block)") {
+      val result = compileWarnings(
+        """
+          |import { java.util.* }
+          |val v: Int = Colls::getOrDefault(Json::parse("{\"a\": null}") as Map[String, Int], "a", 0)
+          |val w: Int = Objects::requireNonNullElse(7, 5)
+          |println(v + w)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 2, s"expected 2 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
     }
 
     it("fails compilation under warnings-as-errors") {

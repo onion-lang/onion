@@ -1301,6 +1301,11 @@ class SemanticErrorReporter(threshold: Int) {
         problem(position, format(
           message(if (clash.isStatic) "error.semantic.recordObjectMethodStatic" else "error.semantic.recordObjectMethodPrivate"),
           Seq(typeName(items(0)), asString(items(1)), args)))
+      // E0107 for `old(...)` in a lambda: the program ran before, so name the edit (#2732).
+      case SemanticError.CONTRACT_MISPLACED if items.nonEmpty && items(0) == "Lambda" =>
+        problem(position, appendSuggestion(
+          format(message("error.semantic.contractMisplaced"), Seq(message("error.semantic.contractMisplaced.inLambda"))),
+          Some(message("suggestion.oldInLambda"))))
       // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.
       case SemanticError.CONTRACT_FIELD_NOT_VALUE if items.length > 2 && items(2) == "write" =>
         problem(position, format(message("error.semantic.contractFieldWrittenOutside"), Seq(asString(items(0)), asString(items(1)))))

@@ -918,3 +918,24 @@ val s: String = q.x()   // Before: E0000. Now: s
 - **Unchanged:** the bytecode, a non-generic record, and a user-defined `copy` method.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
   only you know which method you meant. The table shows each edit.
+
+## `old(...)` inside a lambda is an error (#2732)
+
+`old(n)` is the value of `n` on entry to the method. It is saved in the method's own frame,
+and a lambda has a frame of its own. So `old(...)` written inside a lambda of an `ensures` or
+a `history` now gets E0107. Before, it compiled and ran under the default `--contracts check`,
+and `--contracts runtime` crashed with `NoSuchFieldError`.
+
+```onion
+// Before: compiled. Now: E0107
+def raise(k: Int): void ensures ((x: Int) -> x >= old(n)).call(n) { n = n + k }
+// Now: pass the value in as an argument
+def raise(k: Int): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + k }
+```
+
+- **What you see:** `[E0107] old(...) is the value on entry, so there is none in a lambda`,
+  followed by the hint above.
+- **Unchanged:** `old(...)` outside a lambda, `old(...)` as an argument to a lambda's `call`,
+  and lambdas in a contract that do not use `old(...)`.
+- **No `onion migrate` rule:** the rewrite needs a new lambda parameter for each `old(...)`,
+  and its type and name. The hint shows the edit.

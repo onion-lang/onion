@@ -99,6 +99,13 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(codes(history).contains("E0107"), codes(history).toString)
       val ensures = "class A {\n  var n: Int\npublic:\n  def f(): void ensures ((x: Int) -> x >= old(n)).call(n) { n = n + 1 }\n}"
       assert(codes(ensures).contains("E0107"), codes(ensures).toString)
+      val shown = compile(ensures, ContractMode.Check).map(_.message).mkString("\n")
+      assert(shown.contains(".call(old(n))"), shown)
+    }
+
+    it("runs old() passed into a lambda as an argument, the edit E0107 suggests (#2732)") {
+      val src = "class A {\n  var n: Int\npublic:\n  def this { n = 1 }\n  def f(): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + 1 }\n}"
+      assert(codes(src).isEmpty, codes(src).toString)
     }
 
     it("leaves old and result ordinary names outside a clause") {

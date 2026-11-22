@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.164.0] - 2026-11-22
+
+### Breaking
+
+- **An `if`/`select`/`try` branch whose type arguments differ from the target's is E0000 (#3241).**
+  - Before: `val c: Option[Int] = if b { other } else { tail }` with `other: Option[String]` compiled, and reading `c` threw `ClassCastException`.
+  - Now: E0000 at `other`. Give that branch the target's type. No `onion migrate` rule; see `docs/migration/pre-1.0.md`.
+- **A copy of a generic record has the receiver's type arguments, so code that relied on the bare type changes (#3101).**
+  - An overloaded call on a copied component picks the typed method: `f(q.x())` ran `f(Object)`, now `f(String)`. Keep the old call with `f(q.x() as Object)`.
+  - A copy no longer fits a `P[...]` with other type arguments: `val r: P[Object, Int] = p.copy(y = 3)` with `p: P[String, Int]` compiled, now E0000 (E0005 as an argument). Build that value with `new P[Object, Int](p.x(), 3)`.
+  - No `onion migrate` rule; see `docs/migration/pre-1.0.md`.
+- **`[5, null]` with no expected type is now a `List[Int?]`, not a `List[Int]`.**
+  - Before: `total([1, null])` compiled for a `List[Int]` parameter, then crashed at the first read.
+  - Now: E0005; `ys[0].length()` on `["a", null]` is E0070 (use `?.` or `!!`). Edits per case: `docs/migration/pre-1.0.md`. Map literals are the separate #3201.
+- **An array passed where both `f(x)` and `f(xs...)` apply now picks the same method as Java (#2955).**
+  - Before: `H::s(strings)` ran `s(Object)`, `JList::of(sa).size()` was `1`, and `h.a(ints)` ran `a(Object...)`.
+  - Now: a `String[]` takes `s(Object...)` and `JList::of(sa).size()` is `3`, the same at every call site; an `Int[]` takes `a(Object)`.
+  - Migration: write the type argument to keep the old one-element list, `JList::of[String[]](sa)`. See `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **A trailing `List[String]` on an auto-CLI `main` collects the rest of the arguments (#2576).**
+  - Before: `def main(cmd: String, files: List[String])` was E0094; only `String[]` worked.
+  - Now: it binds the remaining arguments as a list, like `String[]`; `def main(files: List[String])` alone takes every argument. A misplaced or defaulted `List[String]` is E0095, as `String[]` is.
+
+### Fixed
+
+- **An early `return` of the wrong type is caught when the lambda ends in a variable.**
+  - Before: `val c: Option[Int] = ch2(() -> { if b { return Option::some("str") }; tail })` compiled, then threw ClassCastException where `c` was read.
+  - Now: E0000 at the `return`, whatever the lambda's last expression is.
+  - A nullable target (`String?`) is left as before, so a valid early `return null` gets no new W0012 (#3242 stays open).
+- **An extension method with a `[T: Trait]` type parameter gets its real arguments (#3223).**
+  - Before: `"a".k(3)` passed the trait instance as `x`, so it printed `akShow$$Integer@…`; a body using `Show[T]::show(x)` failed with a null error at run time.
+  - Now: `x` is `3` and the instance goes to its own slot, as for a class method.
+- **A subclass can assign an inherited `protected` static var by its bare name (#3175).**
+  - Before: `K = 6` and `K += 1` were E0002 "local variable K is not found"; the read of `K` worked.
+  - Now: with no top-level `var K`, the write reaches the inherited field. A top-level `var K` still takes the write, as before.
+- **`"#{ (1)(2) }"` is a syntax error instead of printing `1` (#3166).**
+  - Before: a call `(...)` left over after the term inside `#{...}` was dropped without a word.
+  - Now: a leftover call is a syntax error, as outside a string. Other leftovers (`#{ 1 2 }`, `#{x,5}`) are still ignored (#3207).
+- **`interface I[T] conforms I[List[T]]` is E0016 when a class conforms to it (#3126).**
+  - Before: the compiler died with `StackOverflowError`.
+  - Now: `[E0016]` names `I`, as it does without the class.
+- **An early `return` in a lambda passed to a generic method is checked against the target type.**
+  - Before: `val c: Option[Int] = ch2(() -> { if b { return Option::some("str") }; Option::none() })` compiled, then threw ClassCastException where `c` was read.
+  - Now: E0000 at the `return`, as when the lambda is assigned to `() -> Option[Int]` directly.
+- **`onion migrate` on a big directory no longer says an old file "compiles as written" (#3115).**
+  - Before: with over 1000 compile errors in the joint compile, a file with an old spelling (`ret`, `self`) was left alone, reported "already up to date", and the exit code was 0.
+  - Now: that file is counted as "need a manual change" and the exit code is 1. Name fewer files, or the file alone, to migrate it.
+- **`copy(..)` on a generic record keeps its type arguments.**
+  - Before: `new P[String, Int]("s", 1).copy(y = 42).x()` was a bare `A`, so `val s: String = …` was E0000.
+  - Now: the copy is a `P[String, Int]`, and `x()` is a `String`.
+- **`copy(a = .., a = ..)` is an error, and a record's own reordered `copy` binds named arguments by name.**
+  - Before: the first duplicate was dropped unrun; `copy(a = "A", b = "B")` on `def copy(b, a)` swapped the values.
+  - Now: `E0044` for a repeated name; on `def copy(b, a)`, `a = "A"` binds the parameter named `a`. A partial `copy(a = "A")` there is `E0005` (missing `b`) instead of a swapped copy.
+  - Unchanged: partial copy through an own `copy(a, b)` or `copy(nx, ny)`, even beside other `copy` overloads.
+- **A local function value is called instead of a default-imported function of the same name.**
+  - Before: `val first: (List[Int]) -> Int = (ys) -> 42` then `first([1, 2, 3])` printed `1`; `map([1, 2], x -> x * 2)` beside a local `map` printed `[2, 4]`.
+  - Now: both call the local (`42`), with any argument, a lambda included. A local whose type does not fit is an error (E0005, or E0070 when it is nullable), not a call to the import. A same-named method of the enclosing class still comes first. Fields are not covered: a function-typed field still loses to an import.
+- **`do[M] { ... }` works inside an `extension` method and a data-carrying `enum` (#3063).**
+  - Before: an extension method failed with `VerifyError` at run time, and an enum constant built from a `do` block was silently `null`.
+  - Now: both run, as the same code does in a class.
+- **The E0008 note for two same-named scripts is in Japanese under `ja` (#3060).**
+  - Before: `クラス xMain (the top-level code of d2/x.on and of d1/x.on would both become this class; rename one file) の定義が...`
+  - Now: the whole note is translated; the English text is unchanged.
+- **A config file's leading BOM survives `readLossless` + `render` (#3035).**
+  - Before: the BOM was dropped, so an edit rewrote more than one value slot.
+  - Now: `render` writes the BOM back; the first key is still read without it.
+- **`history snap >= old(snap)` (a method called without parentheses) gets W0024, like `snap() >= old(snap())` (#3033).**
+  - Before: no warning, so a method that broke the history went unnoticed.
+  - Now: each method that writes a field the history may read is warned, as for the spelling with parentheses.
+- **`new Lazy[T](() -> 5)` and `extends Lazy[T](() -> 5)` are compile errors when `Lazy` takes a `() -> T` (#3018).**
+  - Before: compiled, then threw `ClassCastException` at the first read.
+  - Now: E0021 ("constructor not found"); assigning the same lambda to a `() -> T` value was already an error.
+  - Still compiles: a lambda that only throws (`() -> throw ...`) or whose only value is `null`.
+- **`val xs: Collection[String] = List::of()` compiles (#3017).**
+  - Before: E0000, `List[Object]` is not a `Collection[String]`.
+  - Now: the expected `Collection[String]` fixes the element type, as in Java. Also `Iterable[T]` targets and `def f(): Collection[T] = Collections::emptyList()`.
+- **`Net` `readAll()`/`readBytes()` no longer lose bytes when a read times out.**
+  - Before: a timeout dropped what had arrived, so a retry returned `" world"` for `"hello world"`.
+  - Now: the bytes are kept, and the retry returns all of it.
+- **E0077 names an extension call by its declared receiver.**
+  - Before: `extension List[Int]` read `List.int.shout`, and `Big_Box` read `Big.Box.yell`.
+  - Now: `List[Int].shout` and `Big_Box.yell`.
+- **A list or map literal takes its element types from a nullable target (#3001).**
+  - Before: `val a: List[Int?]? = [1]` was E0000, and `val b: List[Int]? = [1, null]` compiled.
+  - Now: the first compiles; the second is E0000 at the `null`, as it is for `List[Int]`.
+- **`new P()` for a protected constructor of a class in another package is E0013.**
+  - Before: it compiled, then the class failed to load with `VerifyError`.
+  - Now: a compile error, as in Java. A subclass still reaches it through its superclass call, `class S extends P(...)`.
+- **`new C[String](Collections::emptyList())` compiles when `C` has `this(List[T])` and `this(Object)` (#2841).**
+  - Before: E0021, with the argument shown as `List[Object]`.
+  - Now: the `List[T]` constructor is chosen, as in Java. A method call `c.f(Collections::emptyList())` is not changed yet.
+- **`g.n(4)` through `G[JInteger]` runs the inherited `n(x: JInteger)` (#2680).**
+  - Before: an own `n(x: Int)` ran instead, and the inherited exact override was ignored.
+  - Now: the inherited `n(JInteger)` runs, as in Java, also when it is `final`.
+  - The own `n(x: Int)` still runs when the nearest inherited `n(x: JInteger)` is `protected`, `abstract`, or returns an incompatible type.
+- **Two error types in one `do[Result]` block get an error that names the `Result` types (#2670).**
+  - Before: `type Function1[Int, Result[Int, String]] is expected ...`, with the caret on the first bind.
+  - Now: `type Result[Int, String] is expected, but type Result[Int, Int] is used`, with the caret on the clause that returned the other error type and a hint to convert it with `.mapError`.
+
 ## [0.163.0] - 2026-11-21
 
 ### Breaking

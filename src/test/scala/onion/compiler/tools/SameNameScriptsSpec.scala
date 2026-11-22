@@ -62,6 +62,14 @@ class SameNameScriptsSpec extends AnyFunSpec {
         onion.compiler.toolbox.Message(key), "d2/x.on", "d1/x.on")
       assert(message.contains(expectedNote), message)
     }
+    it("a script and a class that share the container's name: one E0008 naming both files (#3060)") {
+      val cls = "class yMain { public: def this {} }"
+      val files = Seq("j1/y.on" -> cls, "e2/y.on" -> "println(\"two\")")
+      val codes = compile(files*)
+      assert(codes == Seq("E0008"), codes)
+      val message = compileDetailed(files*).allErrors.map(_.message).mkString("\n")
+      assert(message.contains("e2/y.on") && message.contains("j1/y.on"), message)
+    }
     it("still compiles scripts with different names") {
       assert(compile("a.on" -> "println(\"one\")", "b.on" -> "println(\"two\")").isEmpty)
     }

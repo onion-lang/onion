@@ -441,6 +441,8 @@ private[compiler] object DuplicationChecks {
 
   def checkErasureSignatureCollisions(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     val seen = mutable.HashMap[(String, String), Method]()
+    // A script that lost its container name to a user class is already E0008 (#3060).
+    if typing.scriptOverClassNames.contains(clazz.name) then return
     for m <- clazz.methods do
       val key = (m.name, erasedMethodDesc(m))
       if seen.contains(key) then

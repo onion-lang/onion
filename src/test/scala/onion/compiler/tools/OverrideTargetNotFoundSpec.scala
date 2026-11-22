@@ -283,6 +283,11 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(whoRuns("Int?", "Int", "void") == onion.tools.Shell.Failure(-1))
     }
 
+    // #3053: the same with a reference return, which used to compile and then throw on `null`.
+    it("reports E0068 for `override def f(k: Int): String` over `f(k: Int?)`") {
+      assert(whoRuns("Int?", "Int", "String") == onion.tools.Shell.Failure(-1))
+    }
+
     it("runs `override def f(k: Int?): String` over `f(k: Int): String`") {
       assert(whoRuns("Int", "Int?", "String") == onion.tools.Shell.Success("Up"))
     }
@@ -438,8 +443,9 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(chain("Int", "Int?", "Int") == onion.tools.Shell.Success("CCCCC"))
     }
 
-    it("dispatches a three-level chain `f(Int?)`, `f(Int)`, `f(Int?)` to the last override") {
-      assert(chain("Int?", "Int", "Int?") == onion.tools.Shell.Success("CCCCC"))
+    // #3053: the middle `override def f(x: Int)` over `f(x: Int?)` would unbox a `null`.
+    it("reports E0068 for a chain `f(Int?)`, `f(Int)`, `f(Int?)`: the middle method narrows `Int?`") {
+      assert(chain("Int?", "Int", "Int?") == onion.tools.Shell.Failure(-1))
     }
 
     // Differing only by `?` is the same slot, `override` or not: `override` is a check and
@@ -471,8 +477,9 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(unmarked("Int", "Int?", "String") == onion.tools.Shell.Success("UpUp"))
     }
 
-    it("runs an unmarked `f(k: Int): String` beside a concrete base `f(k: Int?)`") {
-      assert(unmarked("Int?", "Int", "String") == onion.tools.Shell.Success("UpUp"))
+    // #3053: a bridge would unbox, so a `null` through the base threw; it stays an overload.
+    it("keeps an unmarked `f(k: Int): String` an overload beside a concrete base `f(k: Int?)`") {
+      assert(unmarked("Int?", "Int", "String") == onion.tools.Shell.Success("UpBase"))
     }
 
     it("runs an unmarked `handle(code: Int?)` for an interface default `handle(code: Int)`") {
@@ -671,13 +678,29 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(e0068.exists(_.contains("f(Int?): void")), s"got: $results")
     }
 
-    it("still compiles `override def f(k: Int): String` over `f(k: Int?): String`") {
+    // #3053: it compiled, and a `null` through the base then threw inside the bridge.
+    it("reports E0068, naming `f(Int?): String`, for `override def f(k: Int): String` over `f(k: Int?)`") {
       val results = errors(
         """
           |class Base { public: def this {} def f(k: Int?): String = "Base" }
           |class Up extends Base { public: def this {} override def f(k: Int): String = "Up" }
           |""".stripMargin)
-      assert(results.isEmpty, s"got: $results")
+      val e0068 = results.filter(_._1.contains("E0068")).map(_._2)
+      assert(e0068.exists(_.contains("f(Int?): String")), s"got: $results")
+    }
+
+    it("passes a `null` through the base to `f(k: Int?): String` beside an unmarked `f(k: Int): String`") {
+      val result = shell.run(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int): String = "Up" }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { val b: Base = new Up(); val j: Int? = null; return b.f(j) }
+          |}
+          |""".stripMargin,
+        "NullThroughBaseString.on", Array())
+      assert(result == onion.tools.Shell.Success("Base"))
     }
 
     // An unmarked method that takes over a `?`-different base method changes what a call
@@ -708,6 +731,68 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
           |class Up extends Base { public: def this {} def dec(k: Int): void {} }
           |""".stripMargin)
       assert(marked.isEmpty && overload.isEmpty && exact.isEmpty, s"got: $marked / $overload / $exact")
+    }
+
+    // Panel block on #3227 at 43e4b8f: an unmarked `dec(k: Int): String` beside a concrete
+    // `dec(k: Int?): String` overrode before #3053 and is an overload now, so `b.dec(1)`
+    // through the base went from `Up` to `Base` with no warning left to say so: W0030.
+    def w30(src: String): Seq[String] = {
+      val config = onion.compiler.CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = onion.compiler.WarningLevel.On)
+      new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "W30.on")))
+        .diagnostics.warnings.filter(_.category.code == "W0030").map(_.message)
+    }
+
+    it("warns W0030 for an unmarked `dec(k: Int)` beside a concrete `dec(k: Int?)`, for every return type") {
+      for ret <- Seq("String", "void", "Int") do
+        val body = ret match
+          case "String" => "= \"x\""
+          case "Int" => "= 1"
+          case _ => "{}"
+        val ws = w30(
+          s"""
+             |class Base { public: def this {} def dec(k: Int?): $ret $body }
+             |class Up extends Base { public: def this {} def dec(k: Int): $ret $body }
+             |""".stripMargin)
+        assert(ws.length == 1 && ws.head.contains(s"dec(Int?): $ret") && ws.head.contains("Base"), s"$ret: got: $ws")
+    }
+
+    it("runs the base method for `b.dec(1)` through the base, as W0030 says") {
+      val result = shell.run(
+        """
+          |class Base { public: def this {} def dec(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def dec(k: Int): String = "Up" }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { val b: Base = new Up(); val u: Up = new Up(); return b.dec(1) + u.dec(1) + b.dec(null) }
+          |}
+          |""".stripMargin,
+        "W30Runs.on", Array())
+      assert(result == onion.tools.Shell.Success("BaseUpBase"))
+    }
+
+    it("does not warn W0030 with a nullable parameter, beside an own `f(k: Int?)`, over a final base, or in the reverse direction") {
+      val overrides = w30(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int?): String = "Up" }
+          |""".stripMargin)
+      val sibling = w30(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int?): String = "Up?" def f(k: Int): String = "Up" }
+          |""".stripMargin)
+      val finalBase = w30(
+        """
+          |class Base { public: def this {} final def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int): String = "Up" }
+          |""".stripMargin)
+      val reverse = w30(
+        """
+          |class Base { public: def this {} def f(k: Int): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int?): String = "Up" }
+          |""".stripMargin)
+      assert(overrides.isEmpty && sibling.isEmpty && finalBase.isEmpty && reverse.isEmpty,
+        s"got: $overrides / $sibling / $finalBase / $reverse")
     }
 
     // Panel block 8 on #3051 at a2d2e98.

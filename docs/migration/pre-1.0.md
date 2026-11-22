@@ -143,7 +143,7 @@ public:
 - **`this` is a `Mid[U]`:** inside `class Mid[U]`, `this` keeps `U`, also through
   `val me = this`, `id(this)`, `[this]` or `() -> this`. So `same(this)` fits an inherited
   `same(o: Box[T])`, and `me.get()` is a `U` (it was raw `Mid`, so `me.get()` was an `Object`).
-- **Branches with different type arguments:** `if b { [t] } else { [u] }` is a raw `List`.
+- **Branches with different type arguments:** `if b { [t] } else { [u] }` is a `List[?]` (#3255).
   It compiles where an `Object` is expected; where a `List[T]` is expected, the `[u]` branch is
   `E0000`.
 - **No `onion migrate` rule, on purpose:** the only mechanical rewrite is inserting
@@ -949,7 +949,7 @@ val c: Option[Int] = if b { other } else { tail }   // Before: compiled. Now: E0
 - **What you see:** E0000 (`type Option[Int] is expected, but type Option[String] is used`),
   with the caret at the branch that does not fit.
 - **Unchanged:** branches that fit the target, a target such as `Object`, and a join with
-  no target (`val c = if b { other } else { tail }` is still a raw `Option`).
+  no target (`val c = if b { other } else { tail }` is an `Option[?]`; see #3255 below).
 - **No `onion migrate` rule:** the program holds a value of the wrong type, and only you
   know which branch is wrong. The error points at it.
 
@@ -966,14 +966,20 @@ val c: Option[Int] = x                 // Before: compiled. Now: E0000
 
 | Program | Before | Now | To keep it compiling |
 |---|---|---|---|
-| `f(if b { other } else { tail })` with `f(x: Option[Int])` | compiled; `ClassCastException` on read | E0005 | give both branches the parameter's type |
-| `chk { if b { other } else { tail } }` with `chk(f: () -> Option[Int])` | compiled | E0000 | the same |
+| `f(if b { other } else { tail })` with `f(x: Option[Int])` | compiled; `ClassCastException` on read | E0000 at `other` | give both branches the parameter's type |
+| `chk { if b { other } else { tail } }` with `chk(f: () -> Option[Int])` | compiled | E0000 at `other` | the same |
 | `val x = if b { other } else { tail }; val c: Option[Int] = x` | compiled | E0000 | annotate `x`, or give both branches one type |
 
-- **What you see:** E0000 or E0005 naming `Option[?]`. For a `select` in a lambda for a
-  generic parameter, E0000 now points at the call, not the branch.
-- **Unchanged:** a target such as `Object`, calling a method on the join, and branches that fit.
+- **What you see:** with a target, E0000 at the branch that does not fit, naming its type
+  (`Option[String]`). With no target, E0000 where the value is used, naming `Option[?]`. A call
+  to an overloaded function is E0005 naming `Option[?]`.
+- **Unchanged:** a target such as `Object`, calling a method on the join (`j.map { x -> .. }`
+  sees an `Object` element), and branches that fit.
+- **An empty branch takes the other type:** `f(if b { some(1) } else { none() })`,
+  `g(if b { [1, 2] } else { [] })` and `val x = if b { some(1) } else { none() }` still compile;
+  `none()`, `[]` and `[:]` take the parameter's type, or the other branch's.
 - **No `onion migrate` rule:** the value had the wrong type, and only you know which branch to fix.
+
 ## A named call above its callee binds by name, as a call below it does (#3110)
 
 A call with named arguments can now reach a function or method declared later in the file.

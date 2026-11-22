@@ -4702,10 +4702,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0095-mains-string-parameter-is-misplaced" class="md-nav__link">
+  <a href="#e0095-mains-string-or-liststring-parameter-is-misplaced" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0095 — main's String[] parameter is misplaced
+        E0095 — main's String[] or List[String] parameter is misplaced
       
     </span>
   </a>
@@ -6803,10 +6803,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0095-mains-string-parameter-is-misplaced" class="md-nav__link">
+  <a href="#e0095-mains-string-or-liststring-parameter-is-misplaced" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0095 — main's String[] parameter is misplaced
+        E0095 — main's String[] or List[String] parameter is misplaced
       
     </span>
   </a>
@@ -8271,19 +8271,19 @@ are not checked.</p>
 <h3 id="e0094-main-parameter-has-a-type-auto-cli-cannot-read"><code>E0094</code> — <code>main</code> parameter has a type auto-CLI cannot read<a class="headerlink" href="#e0094-main-parameter-has-a-type-auto-cli-cannot-read" title="Permanent link">&para;</a></h3>
 <p>A top-level auto-CLI <code>main</code> parameter's type is neither a supported scalar (<code>String</code>,
 <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code>) nor, as the last
-parameter, a <code>String[]</code> rest collector.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">tags</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
+parameter, a <code>String[]</code> or <code>List[String]</code> rest collector.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">opts</span><span class="p">:</span><span class="w"> </span><span class="nc">Map</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[:]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span>
 </span><span id="__span-59-3"><a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a><span class="p">}</span>
-</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a><span class="c1">// E0094: `main` cannot derive a command line: parameter `tags` has type</span>
-</span><span id="__span-59-5"><a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a><span class="c1">//        List[String], which cannot be read from an argument.</span>
+</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a><span class="c1">// E0094: `main` cannot derive a command line: parameter `opts` has type</span>
+</span><span id="__span-59-5"><a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a><span class="c1">//        Map[String,String], which cannot be read from an argument.</span>
 </span></code></pre></div>
-<p>Use a scalar, or <code>String[]</code> as the last parameter to collect repeated/trailing
-arguments (e.g. <code>def main(cmd: String, files: String[])</code>).</p>
+<p>Use a scalar, or <code>String[]</code> or <code>List[String]</code> as the last parameter to collect
+trailing arguments (e.g. <code>def main(cmd: String, files: List[String])</code>).</p>
 <p>A varargs parameter (<code>files: String...</code>) is E0094 too: write <code>files: String[]</code>. A <code>tool</code>
 reports the same mistake as <code>E0081</code>.</p>
-<h3 id="e0095-mains-string-parameter-is-misplaced"><code>E0095</code> — <code>main</code>'s <code>String[]</code> parameter is misplaced<a class="headerlink" href="#e0095-mains-string-parameter-is-misplaced" title="Permanent link">&para;</a></h3>
-<p>A top-level auto-CLI <code>main</code> has a <code>String[]</code> parameter that is not in a supported
+<h3 id="e0095-mains-string-or-liststring-parameter-is-misplaced"><code>E0095</code> — <code>main</code>'s <code>String[]</code> or <code>List[String]</code> parameter is misplaced<a class="headerlink" href="#e0095-mains-string-or-liststring-parameter-is-misplaced" title="Permanent link">&para;</a></h3>
+<p>A top-level auto-CLI <code>main</code> has a <code>String[]</code> or <code>List[String]</code> parameter that is not in a supported
 position: not the only parameter (raw argv) and not the last parameter (a rest
 collector preceded only by required scalars).</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[],</span><span class="w"> </span><span class="n">flag</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
@@ -8292,8 +8292,10 @@ collector preceded only by required scalars).</p>
 </span><span id="__span-60-4"><a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="c1">// E0095: `main` has a String[] parameter, `args`, that is not in a supported</span>
 </span><span id="__span-60-5"><a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a><span class="c1">//        position.</span>
 </span></code></pre></div>
-<p>A <code>String[]</code> parameter must be either the only parameter, or the last parameter
-with no default value, preceded only by required (no-default) scalar parameters.</p>
+<p>Such a parameter must be either the only parameter, or the last parameter with no
+default value, preceded only by required (no-default) scalar parameters. A defaulted
+<code>List[String]</code> (<code>tags: List[String] = []</code>) is E0095 too: drop the default, since an
+empty rest is already an empty list.</p>
 <h2 id="trycatch-errors">Try/catch errors<a class="headerlink" href="#trycatch-errors" title="Permanent link">&para;</a></h2>
 <h3 id="e0083-unreachable-catch-clause"><code>E0083</code> — Unreachable catch clause<a class="headerlink" href="#e0083-unreachable-catch-clause" title="Permanent link">&para;</a></h3>
 <p>A later <code>catch</code> clause whose exception type is already a subtype of (or the same as)
@@ -9484,7 +9486,7 @@ up; see <a href="#warnings">Warnings</a> above for the <code>W</code> codes.</p>
 </tr>
 <tr>
 <td><code>E0095</code></td>
-<td><code>main</code> has a String[] parameter, <code>…</code>, that is not in a supported position</td>
+<td><code>main</code> has a String[] or List[String] parameter, <code>…</code>, that is not in a supported position</td>
 </tr>
 <tr>
 <td><code>E0096</code></td>

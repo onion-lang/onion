@@ -2788,10 +2788,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0095-main-string" class="md-nav__link">
+  <a href="#e0095-main-string-liststring" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0095 — main の String[] パラメータが未対応の位置にある
+        E0095 — main の String[] / List[String] パラメータが未対応の位置にある
       
     </span>
   </a>
@@ -6824,10 +6824,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#e0095-main-string" class="md-nav__link">
+  <a href="#e0095-main-string-liststring" class="md-nav__link">
     <span class="md-ellipsis">
       
-        E0095 — main の String[] パラメータが未対応の位置にある
+        E0095 — main の String[] / List[String] パラメータが未対応の位置にある
       
     </span>
   </a>
@@ -8285,27 +8285,29 @@ json shape を持たないレコード、受け付ける型を指す型エイリ
 <h3 id="e0094-main"><code>E0094</code> — <code>main</code> のパラメータの型をコマンドラインから読み取れない<a class="headerlink" href="#e0094-main" title="Permanent link">&para;</a></h3>
 <p>トップレベルの自動 CLI <code>main</code> のパラメータの型が、対応するスカラー型（<code>String</code>、<code>Int</code>、
 <code>Long</code>、<code>Double</code>、<code>Float</code>、<code>Boolean</code>、<code>Short</code>、<code>Byte</code>）でも、最後のパラメータとしての
-<code>String[]</code> rest collector でもありません。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">tags</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
+<code>String[]</code> か <code>List[String]</code> の rest collector でもありません。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">opts</span><span class="p">:</span><span class="w"> </span><span class="nc">Map</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[:]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span>
 </span><span id="__span-59-3"><a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a><span class="p">}</span>
-</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a><span class="c1">// E0094: `main` はコマンドラインを導出できません: パラメータ `tags` の型</span>
-</span><span id="__span-59-5"><a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a><span class="c1">//        List[String] は引数から読み取れません。</span>
+</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a><span class="c1">// E0094: `main` はコマンドラインを導出できません: パラメータ `opts` の型</span>
+</span><span id="__span-59-5"><a id="__codelineno-59-5" name="__codelineno-59-5" href="#__codelineno-59-5"></a><span class="c1">//        Map[String,String] は引数から読み取れません。</span>
 </span></code></pre></div>
-<p>スカラー型を使うか、繰り返し・末尾引数を集めたいなら最後のパラメータを <code>String[]</code> にして
-ください（例: <code>def main(cmd: String, files: String[])</code>）。</p>
+<p>スカラー型を使ってください。末尾の引数を集めたいなら、最後のパラメータを <code>String[]</code> か
+<code>List[String]</code> にしてください（例: <code>def main(cmd: String, files: List[String])</code>）。</p>
 <p>可変長引数のパラメータ（<code>files: String...</code>）も E0094 です。<code>files: String[]</code> と書いてください。
 <code>tool</code> では同じ誤りが <code>E0081</code> になります。</p>
-<h3 id="e0095-main-string"><code>E0095</code> — <code>main</code> の <code>String[]</code> パラメータが未対応の位置にある<a class="headerlink" href="#e0095-main-string" title="Permanent link">&para;</a></h3>
-<p>トップレベルの自動 CLI <code>main</code> に <code>String[]</code> パラメータがありますが、その位置が未対応です
+<h3 id="e0095-main-string-liststring"><code>E0095</code> — <code>main</code> の <code>String[]</code> / <code>List[String]</code> パラメータが未対応の位置にある<a class="headerlink" href="#e0095-main-string-liststring" title="Permanent link">&para;</a></h3>
+<p>トップレベルの自動 CLI <code>main</code> に <code>String[]</code> か <code>List[String]</code> のパラメータがありますが、その位置が未対応です
 （単独の引数でも、最後のパラメータでもありません）。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[],</span><span class="w"> </span><span class="n">flag</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a><span class="w">  </span><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="s2">"BODY RAN"</span><span class="p">)</span>
 </span><span id="__span-60-3"><a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a><span class="p">}</span>
-</span><span id="__span-60-4"><a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="c1">// E0095: `main` のパラメータ `args` (String[]) は未対応の位置にあります。</span>
+</span><span id="__span-60-4"><a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="c1">// E0095: `main` のパラメータ `args` (String[] または List[String]) は未対応の位置にあります。</span>
 </span></code></pre></div>
-<p><code>String[]</code> パラメータは単独のパラメータ（raw argv）か、デフォルト値のない最後のパラメータ
-（それより前はすべて必須のスカラー）のいずれかでなければなりません。</p>
+<p>このパラメータは単独のパラメータ（raw argv）か、デフォルト値のない最後のパラメータ
+（それより前はすべて必須のスカラー）のいずれかでなければなりません。既定値付きの
+<code>List[String]</code>（<code>tags: List[String] = []</code>）も E0095 です。既定値を外してください。残りの
+引数がなければ、空のリストになります。</p>
 <h2 id="trycatch">try/catch エラー<a class="headerlink" href="#trycatch" title="Permanent link">&para;</a></h2>
 <h3 id="e0083-catch"><code>E0083</code> — 到達不能な catch 節<a class="headerlink" href="#e0083-catch" title="Permanent link">&para;</a></h3>
 <p>後ろにある <code>catch</code> 節の例外型が、手前の節の型のサブタイプ（または同じ型）である場合、
@@ -9482,7 +9484,7 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </tr>
 <tr>
 <td><code>E0095</code></td>
-<td><code>main</code> has a String[] parameter, <code>…</code>, that is not in a supported position</td>
+<td><code>main</code> has a String[] or List[String] parameter, <code>…</code>, that is not in a supported position</td>
 </tr>
 <tr>
 <td><code>E0096</code></td>

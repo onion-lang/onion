@@ -2427,6 +2427,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#null-nullable-2998" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        null 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fx-fxs-java-2955" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        f(x) と f(xs...) に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        総称レコードのコピーが型引数を保つようになりました (#3101)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3241" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型引数の違う分岐が、期待される型で検査されるようになりました (#3241)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5291,6 +5335,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#null-nullable-2998" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        null 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fx-fxs-java-2955" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        f(x) と f(xs...) に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        総称レコードのコピーが型引数を保つようになりました (#3101)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3241" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型引数の違う分岐が、期待される型で検査されるようになりました (#3241)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6092,6 +6180,229 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
   どちらか一方の多重定義しか当てはまらない呼び出しです。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが <code>as</code> を示します。</li>
+</ul>
+<h2 id="null-nullable-2998"><code>null</code> 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)<a class="headerlink" href="#null-nullable-2998" title="Permanent link">&para;</a></h2>
+<p>期待される型がない <code>[x, null]</code> は、以前は non-null 型のリストでした。
+現在は nullable 型のリストになり、<code>null</code> がチェッカーから見えるようになりました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">ys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="n">ys</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nf">length</span><span class="p">())</span><span class="w">     </span><span class="c1">// 以前: 1。現在: E0070</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="n">ys</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">?.</span><span class="nf">length</span><span class="p">())</span><span class="w">    </span><span class="c1">// 以前も現在も 1</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>プログラム</th>
+<th>以前</th>
+<th>現在</th>
+<th>直し方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>val ys = ["a", null]; ys[0].length()</code></td>
+<td><code>1</code></td>
+<td>E0070</td>
+<td><code>ys[0]?.length()</code> または <code>ys[0]!!.length()</code></td>
+</tr>
+<tr>
+<td><code>total(xs: List[Int])</code> に対する <code>total([1, null])</code></td>
+<td>コンパイルでき、<code>null</code> で実行時エラー</td>
+<td>E0005</td>
+<td><code>List[Int?]</code> を受け取り、各 <code>null</code> を処理する</td>
+</tr>
+<tr>
+<td><code>xs = [1, null]</code> のとき <code>val n: Int = xs[1]</code></td>
+<td>コンパイルでき、<code>null</code> で実行時エラー</td>
+<td>E0070</td>
+<td><code>xs[1] ?: 0</code></td>
+</tr>
+<tr>
+<td><code>String::join(",", ["a", null, "c"])</code></td>
+<td><code>a,null,c</code></td>
+<td>E0005</td>
+<td><code>String::join(",", ["a", null, "c"].map { s -&gt; s ?: "null" })</code></td>
+</tr>
+<tr>
+<td><code>[[1, null], [2]]</code></td>
+<td><code>List[List[Int]]</code></td>
+<td><code>List[Object]</code></td>
+<td>内側のリストの要素型をそろえる</td>
+</tr>
+<tr>
+<td><code>["a", null] + ["b"]</code></td>
+<td>コンパイルできた</td>
+<td>E0001</td>
+<td>両方を <code>List[String?]</code> にそろえる</td>
+</tr>
+<tr>
+<td><code>xs = ["b", null, "a"]</code> のとき <code>xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))</code></td>
+<td><code>[null, a, b]</code></td>
+<td>E0005</td>
+<td>要素型を一度だけ書く: <code>Comparator::naturalOrder[String?]()</code></td>
+</tr>
+<tr>
+<td>同じ <code>xs</code> で <code>xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))</code></td>
+<td><code>[null, a, b]</code></td>
+<td>E0005</td>
+<td><code>String?</code> を比べる比較器にする: <code>Comparator::nullsFirst[String?]((a, b) -&gt; a!!.compareToIgnoreCase(b!!))</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> E0070（<code>may be null and cannot be dereferenced directly</code>）です。<code>List[Int]</code> の変数に代入した場合は E0000 です。<code>List[Int]</code> の引数や、<code>xs.sort(comparator)</code>・<code>Collections::sort(xs, comparator)</code>・<code>String::join</code> などの Java のジェネリックメソッドに渡した場合は E0005 です。原因はリテラル中の <code>null</code> です。</li>
+<li><strong>要素型に対する Java の比較器:</strong> <code>nullsFirst</code> は、包んだ比較器に <code>null</code> を渡しません。しかし、そのシグネチャではそれを表せません。上の二つの <code>sort</code> の行のように、型引数 <code>String?</code> を一度だけ書きます。そこでの <code>!!</code> が失敗することはありません。</li>
+<li><strong>型を明示すれば今までどおり書けます:</strong> <code>val ys: List[Int?] = [1, null]</code>。<code>null</code> が入らないため <code>List[Int]</code> は拒否されます。</li>
+<li><strong>変わらないもの:</strong> <code>[null]</code>、<code>[null, null]</code>、期待される型が分かっているリテラルです。</li>
+<li><strong>残っている差:</strong> <code>["a": "x", "b": null]</code> のように <code>null</code> の値を含むマップリテラルは、今も non-null の値型になります。これは #3201 で、別の変更として移行表の行も別に用意します。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> <code>null</code> をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。</li>
+</ul>
+<h2 id="fx-fxs-java-2955"><code>f(x)</code> と <code>f(xs...)</code> に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)<a class="headerlink" href="#fx-fxs-java-2955" title="Permanent link">&para;</a></h2>
+<p>配列に <code>f(x)</code> と <code>f(xs...)</code> の両方が当てはまるとき、以前の Onion は可変長引数の方を外していました。
+Java はその配列を可変長引数の配列そのものとして扱い、<code>f(xs...)</code> を選びます。
+Onion も同じ動作になりました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">util</span><span class="p">.</span><span class="nc">List</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">JList</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">sa</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">,</span><span class="w"> </span><span class="s2">"c"</span><span class="p">].</span><span class="nf">toArray</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">String</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nc">JList</span><span class="o">::</span><span class="nf">of</span><span class="p">(</span><span class="n">sa</span><span class="p">).</span><span class="nf">size</span><span class="p">())</span><span class="w">             </span><span class="c1">// 以前: 1。現在: 3</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nc">JList</span><span class="o">::</span><span class="n">of</span><span class="p">[</span><span class="nc">String</span><span class="p">[]](</span><span class="n">sa</span><span class="p">).</span><span class="nf">size</span><span class="p">())</span><span class="w">   </span><span class="c1">// 以前も現在も 1</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>呼び出し</th>
+<th>以前</th>
+<th>現在</th>
+<th>以前の結果を保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JList::of(sa).size()</code>、<code>JSet::of(sa).size()</code></td>
+<td><code>1</code></td>
+<td><code>3</code></td>
+<td><code>JList::of[String[]](sa)</code></td>
+</tr>
+<tr>
+<td><code>Stream::of(sa).count()</code></td>
+<td><code>1</code></td>
+<td><code>3</code></td>
+<td><code>Stream::of[String[]](sa)</code></td>
+</tr>
+<tr>
+<td><code>val n: List[String[]] = JList::of(sa)</code></td>
+<td>コンパイルできた</td>
+<td>E0000</td>
+<td><code>JList::of[String[]](sa)</code></td>
+</tr>
+<tr>
+<td><code>s(o: Object)</code> と <code>s(xs: Object...)</code> がある <code>H::s(sa)</code></td>
+<td><code>s(Object)</code></td>
+<td><code>s(Object...)</code></td>
+<td><code>H::s(sa as Object)</code></td>
+</tr>
+<tr>
+<td><code>ia: Int[]</code> と、<code>a(o: Object)</code>・<code>a(xs: Object...)</code> がある <code>h.a(ia)</code></td>
+<td><code>a(Object...)</code></td>
+<td><code>a(Object)</code></td>
+<td><code>ia</code> を入れた <code>Object[]</code> を渡す: <code>val w: Object[] = new Object[1]; w[0] = ia; h.a(w)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> 多くの場合は何も表示されず、別のメソッドが実行されます。
+  <code>List[String[]]</code> と宣言した変数では E0000（<code>type List[String[]] is expected, but type List[String] is used</code>）になります。</li>
+<li><strong><code>Int[]</code> が逆向きに変わる理由:</strong> <code>Int[]</code> は <code>Object[]</code> ではありません。
+  そのため Java と同じく、<code>a(o: Object)</code> にしか当てはまりません。</li>
+<li><strong>今までどおり動くもの:</strong> 配列でない引数 1 個（<code>s("x")</code> は <code>s(Object)</code>）、引数が複数の呼び出し
+  （<code>s("x", "y")</code> は <code>s(Object...)</code>）、<code>s(null)</code> です。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、要素 1 個のつもりか配列全体のつもりかは書いた人にしか分かりません。表に各書き換えを示します。</li>
+</ul>
+<h2 id="3101">総称レコードのコピーが型引数を保つようになりました (#3101)<a class="headerlink" href="#3101" title="Permanent link">&para;</a></h2>
+<p>以前は、総称レコードの <code>copy(..)</code> が裸の型変数のレコードを返していました。
+そのため、コピーから読んだ要素は型 <code>A</code> でした。
+現在のコピーは、<code>this</code> と同じく受け手自身の型を持ちます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">P</span><span class="p">[</span><span class="nc">A</span><span class="p">,</span><span class="w"> </span><span class="nc">B</span><span class="p">](</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">A</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="nc">B</span><span class="p">)</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">P</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="kt">Int</span><span class="p">](</span><span class="s2">"s"</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">).</span><span class="nf">copy</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="nf">x</span><span class="p">()</span><span class="w">   </span><span class="c1">// 以前: E0000。現在: s</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>プログラム</th>
+<th>以前</th>
+<th>現在</th>
+<th>以前の結果を保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f(o: Object)</code> と <code>f(s: String)</code> がある <code>f(q.x())</code></td>
+<td><code>f(Object)</code></td>
+<td><code>f(String)</code></td>
+<td><code>f(q.x() as Object)</code></td>
+</tr>
+<tr>
+<td><code>p: P[String, Int]</code> での <code>val r: P[Object, Int] = p.copy(y = 3)</code></td>
+<td>コンパイルできた</td>
+<td>E0000</td>
+<td><code>new P[Object, Int](p.x(), 3)</code></td>
+</tr>
+<tr>
+<td><code>take(r: P[Object, Int])</code> がある <code>take(p.copy())</code></td>
+<td>コンパイルできた</td>
+<td>E0005</td>
+<td><code>take(new P[Object, Int](p.x(), p.y()))</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> E0000（<code>type P[Object, Int] is expected, but type P[String, Int] is used</code>）、
+  引数なら E0005 です。多重定義の呼び出しでは何も表示されず、別のメソッドが実行されます。</li>
+<li><strong>代入が拒否される理由:</strong> 型引数は不変（invariant: 型引数が違えば別の型）です。
+  <code>copy</code> を使わない <code>val r: P[Object, Int] = p</code> も、もともと E0000 でした。コピーも同じ規則に従います。</li>
+<li><strong>今までどおり動くもの:</strong> バイトコード、総称でないレコード、利用者が定義した <code>copy</code> メソッドです。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、どのメソッドのつもりかは書いた人にしか分かりません。表に各書き換えを示します。</li>
+</ul>
+<h2 id="3241">型引数の違う分岐が、期待される型で検査されるようになりました (#3241)<a class="headerlink" href="#3241" title="Permanent link">&para;</a></h2>
+<p>同じ総称クラスで型引数だけが違う二つの分岐は、原型（raw: 型引数のないクラス）に合流します。
+以前は、原型の値がどの期待される型にも合っていました。
+現在は、<code>if</code>・<code>select</code>・<code>try</code> に型引数つきの期待される型があれば、各分岐をその型で検査します。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">other</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">some</span><span class="p">(</span><span class="s2">"str"</span><span class="p">)</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">tail</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">none</span><span class="p">()</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">tail</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// 以前: コンパイルできた。現在: `other` で E0000</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>プログラム</th>
+<th>以前</th>
+<th>現在</th>
+<th>コンパイルを通すには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>val c: Option[Int] = if b { other } else { tail }</code></td>
+<td>コンパイルでき、<code>c.get() + 1</code> が <code>ClassCastException</code> を投げた</td>
+<td>E0000</td>
+<td>分岐を期待される型にそろえるか、<code>Object</code> のような広い型にする</td>
+</tr>
+<tr>
+<td><code>def f(b: Boolean): Option[Int] = if b { other } else { tail }</code></td>
+<td>コンパイルできた</td>
+<td>E0000</td>
+<td>同上</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> E0000（<code>type Option[Int] is expected, but type Option[String] is used</code>）です。
+  キャレットは型の合わない分岐を指します。</li>
+<li><strong>今までどおり動くもの:</strong> 期待される型に合う分岐、<code>Object</code> のような期待される型、
+  期待される型のない合流です（<code>val c = if b { other } else { tail }</code> は今も原型の <code>Option</code> です）。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> プログラムが間違った型の値を持っています。
+  どの分岐が間違いかは書いた人にしか分かりません。エラーがその分岐を指します。</li>
 </ul>
 
 

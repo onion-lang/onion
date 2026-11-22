@@ -6321,6 +6321,11 @@ null でない <code>Comparable</code>（String、BigDecimal、LocalDate、<code
 パラメータ — 後ろにさらにパラメータが続く先頭や、途中にあるもの — はコンパイル
 エラーです。唯一のパラメータ（生の argv）か、最後のパラメータ（rest コレクタ）の
 どちらかでなければなりません。</p>
+<p>rest コレクタは <code>List[String]</code> とも書けます
+（<code>def main(cmd: String, files: List[String])</code>）。集める引数は同じで、
+リストとして受け取ります。<code>String[]</code> と同じく、唯一のパラメータにもできます
+（<code>def main(files: List[String])</code> はすべての引数を受け取ります）。
+既定値は付けられません。位置が違うもの・既定値付きのものは E0095 です。</p>
 <h2 id="_29">警告<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h2>
 <p><code>--warn off|on|error</code> でレベルを設定します。<code>--Wno codes</code> で特定の警告を抑制します。
 注目: W0006 未使用パラメータ、W0012 null リテラルが非 nullable 型に流れる。</p>

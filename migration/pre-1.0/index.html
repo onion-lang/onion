@@ -4341,6 +4341,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-list-literal-with-a-null-element-is-a-list-of-nullable-2998" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A list literal with a null element is a list of nullable (#2998)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-array-passed-to-fx-fxs-picks-javas-method-2955" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An array passed to f(x) / f(xs...) picks Java's method (#2955)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-copy-of-a-generic-record-keeps-its-type-arguments-3101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A copy of a generic record keeps its type arguments (#3101)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#branches-with-other-type-arguments-are-checked-against-the-target-3241" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Branches with other type arguments are checked against the target (#3241)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5270,6 +5314,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-list-literal-with-a-null-element-is-a-list-of-nullable-2998" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A list literal with a null element is a list of nullable (#2998)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-array-passed-to-fx-fxs-picks-javas-method-2955" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An array passed to f(x) / f(xs...) picks Java's method (#2955)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-copy-of-a-generic-record-keeps-its-type-arguments-3101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A copy of a generic record keeps its type arguments (#3101)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#branches-with-other-type-arguments-are-checked-against-the-target-3241" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Branches with other type arguments are checked against the target (#3241)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6185,6 +6273,235 @@ plain overload fits too, Java's rules pick between them.</p>
   interface, and a call to only one of the overloads.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> finding the affected calls needs overload resolution, and
   only you know which overload a call meant. The hint shows the cast instead.</li>
+</ul>
+<h2 id="a-list-literal-with-a-null-element-is-a-list-of-nullable-2998">A list literal with a <code>null</code> element is a list of nullable (#2998)<a class="headerlink" href="#a-list-literal-with-a-null-element-is-a-list-of-nullable-2998" title="Permanent link">&para;</a></h2>
+<p><code>[x, null]</code> with no expected type used to be a list of the non-null type. It is now a list of
+the nullable type, so the <code>null</code> is visible to the checker.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">ys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="n">ys</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nf">length</span><span class="p">())</span><span class="w">     </span><span class="c1">// Before: 1. Now: E0070</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="n">ys</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">?.</span><span class="nf">length</span><span class="p">())</span><span class="w">    </span><span class="c1">// 1, before and now</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Program</th>
+<th>Before</th>
+<th>Now</th>
+<th>To fix it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>val ys = ["a", null]; ys[0].length()</code></td>
+<td><code>1</code></td>
+<td>E0070</td>
+<td><code>ys[0]?.length()</code> or <code>ys[0]!!.length()</code></td>
+</tr>
+<tr>
+<td><code>total([1, null])</code> with <code>total(xs: List[Int])</code></td>
+<td>compiled, crashed on the <code>null</code></td>
+<td>E0005</td>
+<td>take <code>List[Int?]</code>, then handle each <code>null</code></td>
+</tr>
+<tr>
+<td><code>val n: Int = xs[1]</code> with <code>xs = [1, null]</code></td>
+<td>compiled, crashed on the <code>null</code></td>
+<td>E0070</td>
+<td><code>xs[1] ?: 0</code></td>
+</tr>
+<tr>
+<td><code>String::join(",", ["a", null, "c"])</code></td>
+<td><code>a,null,c</code></td>
+<td>E0005</td>
+<td><code>String::join(",", ["a", null, "c"].map { s -&gt; s ?: "null" })</code></td>
+</tr>
+<tr>
+<td><code>[[1, null], [2]]</code></td>
+<td><code>List[List[Int]]</code></td>
+<td><code>List[Object]</code></td>
+<td>write the inner lists with one element type</td>
+</tr>
+<tr>
+<td><code>["a", null] + ["b"]</code></td>
+<td>compiled</td>
+<td>E0001</td>
+<td>give both lists the same type: <code>List[String?]</code></td>
+</tr>
+<tr>
+<td><code>xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))</code> with <code>xs = ["b", null, "a"]</code></td>
+<td><code>[null, a, b]</code></td>
+<td>E0005</td>
+<td>name the element type once: <code>Comparator::naturalOrder[String?]()</code></td>
+</tr>
+<tr>
+<td><code>xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))</code> with the same <code>xs</code></td>
+<td><code>[null, a, b]</code></td>
+<td>E0005</td>
+<td>a comparator over <code>String?</code>: <code>Comparator::nullsFirst[String?]((a, b) -&gt; a!!.compareToIgnoreCase(b!!))</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> E0070 (<code>may be null and cannot be dereferenced directly</code>); E0000 when
+  the list is assigned to a <code>List[Int]</code> variable; or E0005 when it is passed to a <code>List[Int]</code>
+  parameter or to a Java generic method such as <code>xs.sort(comparator)</code>,
+  <code>Collections::sort(xs, comparator)</code> or <code>String::join</code>. The cause is the <code>null</code> in the literal.</li>
+<li><strong>A Java comparator over the element type:</strong> <code>nullsFirst</code> passes no <code>null</code> to the
+  comparator it wraps, but its signature cannot say so. Name <code>String?</code> as the type argument
+  once, as in the two <code>sort</code> rows above. The <code>!!</code> there never fails.</li>
+<li><strong>A target type still works:</strong> <code>val ys: List[Int?] = [1, null]</code>. <code>List[Int]</code> is rejected, as the <code>null</code> does not fit.</li>
+<li><strong>Unchanged:</strong> <code>[null]</code>, <code>[null, null]</code>, and a literal whose expected type is already known.</li>
+<li><strong>Known remaining gap:</strong> a map literal with a <code>null</code> value, such as <code>["a": "x", "b": null]</code>, still
+  infers a non-null value type. That is #3201, a separate change with its own migration row.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> deciding what to do with a <code>null</code> (skip it, default it,
+  reject it) depends on the program. The edits above show each choice.</li>
+</ul>
+<h2 id="an-array-passed-to-fx-fxs-picks-javas-method-2955">An array passed to <code>f(x)</code> / <code>f(xs...)</code> picks Java's method (#2955)<a class="headerlink" href="#an-array-passed-to-fx-fxs-picks-javas-method-2955" title="Permanent link">&para;</a></h2>
+<p>When both <code>f(x)</code> and <code>f(xs...)</code> apply to an array, Onion used to drop the varargs one. Java
+treats the array as the varargs array itself, so it picks <code>f(xs...)</code>. Onion now does the same.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">util</span><span class="p">.</span><span class="nc">List</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">JList</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">sa</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">,</span><span class="w"> </span><span class="s2">"c"</span><span class="p">].</span><span class="nf">toArray</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">String</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nc">JList</span><span class="o">::</span><span class="nf">of</span><span class="p">(</span><span class="n">sa</span><span class="p">).</span><span class="nf">size</span><span class="p">())</span><span class="w">             </span><span class="c1">// Before: 1. Now: 3</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nc">JList</span><span class="o">::</span><span class="n">of</span><span class="p">[</span><span class="nc">String</span><span class="p">[]](</span><span class="n">sa</span><span class="p">).</span><span class="nf">size</span><span class="p">())</span><span class="w">   </span><span class="c1">// 1, before and now</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep the old result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JList::of(sa).size()</code>, <code>JSet::of(sa).size()</code></td>
+<td><code>1</code></td>
+<td><code>3</code></td>
+<td><code>JList::of[String[]](sa)</code></td>
+</tr>
+<tr>
+<td><code>Stream::of(sa).count()</code></td>
+<td><code>1</code></td>
+<td><code>3</code></td>
+<td><code>Stream::of[String[]](sa)</code></td>
+</tr>
+<tr>
+<td><code>val n: List[String[]] = JList::of(sa)</code></td>
+<td>compiled</td>
+<td>E0000</td>
+<td><code>JList::of[String[]](sa)</code></td>
+</tr>
+<tr>
+<td><code>H::s(sa)</code> with <code>s(o: Object)</code> and <code>s(xs: Object...)</code></td>
+<td><code>s(Object)</code></td>
+<td><code>s(Object...)</code></td>
+<td><code>H::s(sa as Object)</code></td>
+</tr>
+<tr>
+<td><code>h.a(ia)</code> with <code>ia: Int[]</code>, <code>a(o: Object)</code> and <code>a(xs: Object...)</code></td>
+<td><code>a(Object...)</code></td>
+<td><code>a(Object)</code></td>
+<td>pass an <code>Object[]</code> holding <code>ia</code>: <code>val w: Object[] = new Object[1]; w[0] = ia; h.a(w)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> usually nothing; the program runs the other method. A variable declared
+  as <code>List[String[]]</code> gets E0000 (<code>type List[String[]] is expected, but type List[String] is used</code>).</li>
+<li><strong>Why <code>Int[]</code> changes the other way:</strong> an <code>Int[]</code> is not an <code>Object[]</code>, so it can only fill
+  <code>a(o: Object)</code>, as in Java.</li>
+<li><strong>Unchanged:</strong> a single non-array argument (<code>s("x")</code> takes <code>s(Object)</code>), several arguments
+  (<code>s("x", "y")</code> takes <code>s(Object...)</code>), and <code>s(null)</code>.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> finding the affected calls needs overload resolution, and only
+  you know whether you meant one element or the whole array. The table shows each edit.</li>
+</ul>
+<h2 id="a-copy-of-a-generic-record-keeps-its-type-arguments-3101">A copy of a generic record keeps its type arguments (#3101)<a class="headerlink" href="#a-copy-of-a-generic-record-keeps-its-type-arguments-3101" title="Permanent link">&para;</a></h2>
+<p><code>copy(..)</code> on a generic record used to return the record with bare type variables, so a
+component read from the copy had type <code>A</code>. The copy now has the receiver's own type, as
+<code>this</code> already had.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">P</span><span class="p">[</span><span class="nc">A</span><span class="p">,</span><span class="w"> </span><span class="nc">B</span><span class="p">](</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">A</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="nc">B</span><span class="p">)</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">P</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="kt">Int</span><span class="p">](</span><span class="s2">"s"</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">).</span><span class="nf">copy</span><span class="p">(</span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">q</span><span class="p">.</span><span class="nf">x</span><span class="p">()</span><span class="w">   </span><span class="c1">// Before: E0000. Now: s</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Program</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep the old result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f(q.x())</code> with <code>f(o: Object)</code> and <code>f(s: String)</code></td>
+<td><code>f(Object)</code></td>
+<td><code>f(String)</code></td>
+<td><code>f(q.x() as Object)</code></td>
+</tr>
+<tr>
+<td><code>val r: P[Object, Int] = p.copy(y = 3)</code> with <code>p: P[String, Int]</code></td>
+<td>compiled</td>
+<td>E0000</td>
+<td><code>new P[Object, Int](p.x(), 3)</code></td>
+</tr>
+<tr>
+<td><code>take(p.copy())</code> with <code>take(r: P[Object, Int])</code></td>
+<td>compiled</td>
+<td>E0005</td>
+<td><code>take(new P[Object, Int](p.x(), p.y()))</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> E0000 (<code>type P[Object, Int] is expected, but type P[String, Int] is
+  used</code>), E0005 for an argument, or, for an overloaded call, nothing: the other method runs.</li>
+<li><strong>Why the assignment is rejected:</strong> type arguments are invariant. <code>val r: P[Object, Int] = p</code>
+  without <code>copy</code> was already E0000; the copy now follows the same rule.</li>
+<li><strong>Unchanged:</strong> the bytecode, a non-generic record, and a user-defined <code>copy</code> method.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> finding the affected calls needs overload resolution, and
+  only you know which method you meant. The table shows each edit.</li>
+</ul>
+<h2 id="branches-with-other-type-arguments-are-checked-against-the-target-3241">Branches with other type arguments are checked against the target (#3241)<a class="headerlink" href="#branches-with-other-type-arguments-are-checked-against-the-target-3241" title="Permanent link">&para;</a></h2>
+<p>Two branches of one generic class with different type arguments join as the raw class,
+and a raw value used to fit any target. Now, when the <code>if</code>, <code>select</code> or <code>try</code> has an
+applied target type, each branch is checked against it.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">other</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">some</span><span class="p">(</span><span class="s2">"str"</span><span class="p">)</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">tail</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">none</span><span class="p">()</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">tail</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// Before: compiled. Now: E0000 at `other`</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Program</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep it compiling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>val c: Option[Int] = if b { other } else { tail }</code></td>
+<td>compiled; <code>c.get() + 1</code> threw <code>ClassCastException</code></td>
+<td>E0000</td>
+<td>give the branch the target's type, or use a wider target such as <code>Object</code></td>
+</tr>
+<tr>
+<td><code>def f(b: Boolean): Option[Int] = if b { other } else { tail }</code></td>
+<td>compiled</td>
+<td>E0000</td>
+<td>the same</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> E0000 (<code>type Option[Int] is expected, but type Option[String] is used</code>),
+  with the caret at the branch that does not fit.</li>
+<li><strong>Unchanged:</strong> branches that fit the target, a target such as <code>Object</code>, and a join with
+  no target (<code>val c = if b { other } else { tail }</code> is still a raw <code>Option</code>).</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the program holds a value of the wrong type, and only you
+  know which branch is wrong. The error points at it.</li>
 </ul>
 
 

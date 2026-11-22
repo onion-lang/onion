@@ -6338,6 +6338,11 @@ remaining argument after the required leading ones are consumed. A
 <code>String[]</code> parameter anywhere else — first with more parameters after it,
 or in the middle — is a compile error: it must be either the only
 parameter (raw argv) or the last one (rest collector).</p>
+<p>The rest collector may also be written <code>List[String]</code>
+(<code>def main(cmd: String, files: List[String])</code>); it collects the same
+arguments as a list. Like <code>String[]</code>, it may be the only parameter
+(<code>def main(files: List[String])</code> receives every argument), and it must
+have no default. A misplaced or defaulted one is E0095.</p>
 <h2 id="warnings">Warnings<a class="headerlink" href="#warnings" title="Permanent link">&para;</a></h2>
 <p><code>--warn off|on|error</code> sets the level; <code>--Wno codes</code> suppresses specific
 warnings. Notable: W0006 unused parameter, W0012 null literal flowing into

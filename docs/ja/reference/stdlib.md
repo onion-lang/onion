@@ -504,12 +504,16 @@ L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそ�
 部分はバイト単位で再現され、意図的に変更した値だけが書き直されます。`Residue` は
 不透明な値で、生成した shape にだけ渡し戻してください。
 
+`file(p).readLossless(shape)` は、`read(shape)` と同じく先頭のバイトオーダーマーク（BOM）を
+取り除いたテキストを shape に渡します。`render()` が BOM を書き戻します。そのため、自作の
+shape を含むすべての lossless shape で、往復はバイト単位で一致します。
+
 `Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
 `withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v -> ... }` は更新を
 値にフォーカスします。`render()` がテキストを再構成します:
 
 ```onion
-val r   = configShape.parseLossless(file"app.conf".text()).get()
+val r   = file"app.conf".readLossless(configShape).get()
 val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  1行だけ変わる
 ```

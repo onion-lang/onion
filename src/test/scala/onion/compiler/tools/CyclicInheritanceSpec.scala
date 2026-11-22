@@ -129,5 +129,16 @@ class CyclicInheritanceSpec extends AbstractShellSpec {
       assert(results.contains(Some("E0000")))
       assert(!results.contains(Some("I0000")))
     }
+
+    it("reports E0016, not a stack overflow, when a generic interface conforms to itself with a growing argument (#3126)") {
+      val results = codes(
+        """
+          |interface I[T] conforms I[List[T]] { def f(): T }
+          |class X conforms I[String] { public: def f(): String = "x" }
+          |println(new X().f())
+          |""")
+      assert(results.contains(Some("E0016")))
+      assert(!results.contains(Some("I0000")))
+    }
   }
 }

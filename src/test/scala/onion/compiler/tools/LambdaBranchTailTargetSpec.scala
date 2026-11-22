@@ -48,12 +48,12 @@ class LambdaBranchTailTargetSpec extends AbstractShellSpec {
           |  else: other
           |  }
           |})
-          |""".stripMargin) == Seq("E0000@9"))
+          |""".stripMargin) == Seq("E0000@6"))
       assert(errors(
         """val c: Option[Int] = ch2(() -> {
           |  try { other } catch e: Exception { tail }
           |})
-          |""".stripMargin) == Seq("E0000@7"))
+          |""".stripMargin) == Seq("E0000@6"))
     }
 
     it("list branches") {

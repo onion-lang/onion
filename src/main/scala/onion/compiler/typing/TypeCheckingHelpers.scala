@@ -191,7 +191,13 @@ private[typing] object TypeCheckingHelpers {
       // single shared interface), so members declared there stay callable.
       (left, right) match {
         case (la: AppliedClassType, ra: AppliedClassType) if TypeRelations.sameClass(la.raw, ra.raw) =>
-          return la.raw
+          // Arguments that differ join as `Option[?]`, not the raw `Option`: a raw value
+          // fits every instantiation, so `Option[String]` joined with `Option[Int]` was
+          // accepted as an `Option[Int]` (#3255). A wildcard argument fits none.
+          if (containsTypeVariable(la) || containsTypeVariable(ra) ||
+              la.typeArguments.length != ra.typeArguments.length) return la.raw
+          val any = new WildcardType(rootClass, None)
+          return AppliedClassType(la.raw, la.typeArguments.toList.map(_ => any))
         case (lc: ClassType, rc: ClassType) =>
           return eraseIfArgumentsDiffer(table, nearestCommonAncestor(lc, rc, rootClass), lc, rc)
         case (la: ArrayType, ra: ArrayType) if la.dimension == ra.dimension =>

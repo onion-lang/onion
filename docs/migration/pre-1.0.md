@@ -944,3 +944,25 @@ val c: Option[Int] = if b { other } else { tail }   // Before: compiled. Now: E0
   no target (`val c = if b { other } else { tail }` is still a raw `Option`).
 - **No `onion migrate` rule:** the program holds a value of the wrong type, and only you
   know which branch is wrong. The error points at it.
+
+## A join of different type arguments is `Option[?]`, not a raw `Option` (#3255, #3247)
+
+Branches of one generic class with different type arguments joined as the raw class,
+and a raw value fits any `Option[Int]`. Now the join is `Option[?]`, which fits `Object`
+and nothing narrower. This closes the positions #3241 did not reach.
+
+```onion
+val x = if b { other } else { tail }   // Option[?]
+val c: Option[Int] = x                 // Before: compiled. Now: E0000
+```
+
+| Program | Before | Now | To keep it compiling |
+|---|---|---|---|
+| `f(if b { other } else { tail })` with `f(x: Option[Int])` | compiled; `ClassCastException` on read | E0005 | give both branches the parameter's type |
+| `chk { if b { other } else { tail } }` with `chk(f: () -> Option[Int])` | compiled | E0000 | the same |
+| `val x = if b { other } else { tail }; val c: Option[Int] = x` | compiled | E0000 | annotate `x`, or give both branches one type |
+
+- **What you see:** E0000 or E0005 naming `Option[?]`. For a `select` in a lambda for a
+  generic parameter, E0000 now points at the call, not the branch.
+- **Unchanged:** a target such as `Object`, calling a method on the join, and branches that fit.
+- **No `onion migrate` rule:** the value had the wrong type, and only you know which branch to fix.

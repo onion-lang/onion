@@ -2099,19 +2099,24 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  （onion.Colls::reduc
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
-**`fold`/`reduce`/`foldl` は初期値から始まるため、プリミティブの初期値なら null になりません**:
+**`fold`/`reduce`/`foldl` は初期値から始まるため、プリミティブだけの畳み込みは null になりません**:
 `Colls::fold` と `Colls::reduce` の3引数版（`Iterables::foldl` も同様）は Java の
 ジェネリックメソッド（`<T, R> R fold(List<T>, R, Function2<R, T, R>)`）なので、
-宣言上の戻り値の型は型変数 `R` です。初期値が null でないプリミティブなら
-結果も null ではなく、`Int` へ代入しても `[W0015]` は出ません。
+宣言上の戻り値の型は型変数 `R` です。初期値が null でないプリミティブで、
+ラムダがプリミティブだけを返すなら、結果も null ではありません。
+`Int` へ代入しても `[W0015]` は出ません。
 
 ```onion
 val total: Int = xs.fold(0) { a, b -> a + b }        // 警告なし
+val t: Int = keys.fold(0) { a, k -> m.get(k) }      // [W0015]: Map.get は null を返し得る
 ```
 
 ラムダが `null` を返す場合は従来どおり `[W0012]`、初期値が `Int?` の場合は
-従来どおり `E0070` です。プリミティブで始まらない結果（たとえば
-`Json::getInt`）には `[W0015]` が残ります。
+従来どおり `E0070` です。次の場合は `[W0015]` が残ります。
+
+- ラムダが `m.get(k)` のような Java の値を返す
+- ラムダではない関数値を渡す
+- `Colls::getOrDefault` など、ほかのジェネリックな static メソッド
 
 **`first`/`last` もシャドーイングされますが、無害です**: `onion.Colls` にも
 消去後シグネチャが同じ `first(List)`/`last(List)` 拡張メソッドがあり、

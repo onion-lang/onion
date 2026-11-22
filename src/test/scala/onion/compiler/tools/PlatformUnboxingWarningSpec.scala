@@ -232,6 +232,48 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(codes.contains("W0012"), s"expected W0012 for the null return, got $codes")
     }
 
+    it("does not warn when the fold lambda returns its accumulator or a branch of it (#3209)") {
+      val result = compileWarnings(
+        """
+          |val xs: List[String] = ["a", "b"]
+          |val n: Int = xs.fold(0) { acc, k -> if k == "a" { acc } else { acc + 1 } }
+          |val m: Int = Iterables::foldl(xs, 0, (acc, k) -> acc + k.length())
+          |println(n + m)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
+    it("still warns when the fold lambda returns a platform value that can be null (#3209 block)") {
+      val result = compileWarnings(
+        """
+          |import { java.util.* }
+          |val m: Map[String, Int] = ["a": 1]
+          |val xs: List[String] = ["a", "zz"]
+          |val t: Int = xs.fold(0) { acc, k -> m.get(k) }
+          |val r: Int = xs.reduce(0) { acc, k -> m.get(k) }
+          |val j: Int = Iterables::foldl(xs, 0, (acc, k) -> Json::getInt(Json::parse("{}"), "zz"))
+          |println(t + r + j)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 3, s"expected 3 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+    }
+
+    it("still warns for a generic static whose result can come from a container (#3209 block)") {
+      val result = compileWarnings(
+        """
+          |import { java.util.* }
+          |val v: Int = Colls::getOrDefault(Json::parse("{\"a\": null}") as Map[String, Int], "a", 0)
+          |val w: Int = Objects::requireNonNullElse(7, 5)
+          |println(v + w)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 2, s"expected 2 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+    }
+
     it("fails compilation under warnings-as-errors") {
       val result = compileWarnings(
         """

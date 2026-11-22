@@ -1009,20 +1009,22 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  (onion.Colls::reduce,
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
-**`fold`/`reduce`/`foldl` start from your value, so a primitive start is not null**:
+**`fold`/`reduce`/`foldl` start from your value, so a primitive fold is not null**:
 `Colls::fold` and `Colls::reduce`'s 3-arg form (likewise `Iterables::foldl`) are
 Java generic methods (`<T, R> R fold(List<T>, R, Function2<R, T, R>)`), so their
 declared return type is the type variable `R`. When the initial value is a
-non-null primitive, the result is non-null too, and assigning it to an `Int`
-gives no `[W0015]`:
+non-null primitive and the lambda only returns primitives, the result is
+non-null too, and assigning it to an `Int` gives no `[W0015]`:
 
 ```onion
 val total: Int = xs.fold(0) { a, b -> a + b }        // no warning
+val t: Int = keys.fold(0) { a, k -> m.get(k) }      // [W0015]: Map.get can return null
 ```
 
 A lambda that returns `null` still gets `[W0012]`, and a nullable initial value
-(`Int?`) is `E0070`, as before. A result that is not seeded by a primitive (for
-example `Json::getInt`) keeps `[W0015]`.
+(`Int?`) is `E0070`, as before. `[W0015]` stays for a lambda that returns a Java
+value such as `m.get(k)`, for a function value that is not a lambda, and for
+other generic statics such as `Colls::getOrDefault`.
 
 **`first`/`last` are shadowed too, but harmlessly**: `onion.Colls` also
 declares `first(List)`/`last(List)` extensions with the same erased

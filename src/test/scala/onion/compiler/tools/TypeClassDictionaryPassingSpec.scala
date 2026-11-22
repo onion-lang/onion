@@ -50,6 +50,47 @@ class TypeClassDictionaryPassingSpec extends AbstractShellSpec {
         "def main(args: String[]): Int { return twice(new Agg(), [1,2,4]) }"
       assert(Shell.Success(14) == shell.run(src, "None", Array()))
     }
+    // #3156: every call form forwards the caller's dictionary, not only `a.f(..)`.
+    val agg =
+      "class Agg { public: def this { }\n def total[T: Numeric](xs: List[T]): T { var acc: T = Numeric[T]::zero()\n foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }\n return acc } }\n"
+    val ext =
+      "extension List { def tot[T: Numeric](ys: List[T]): T { return sum(ys) } }\n"
+    it("forwards a dictionary through a super call (#3156)") {
+      val src = prelude + agg +
+        "class Sub extends Agg { public: def this { }\n def twice[T: Numeric](xs: List[T]): T { val t: T = super.total(xs)\n return Numeric[T]::plus(t, t) } }\n" +
+        "def main(args: String[]): Int { return new Sub().twice([1,2,4]) }"
+      assert(Shell.Success(14) == shell.run(src, "None", Array()))
+    }
+    it("forwards a dictionary through a super call with named arguments (#3156)") {
+      val src = prelude + agg +
+        "class Sub extends Agg { public: def this { }\n def twice[T: Numeric](xs: List[T]): T { val t: T = super.total[T](xs = xs)\n return Numeric[T]::plus(t, t) } }\n" +
+        "def main(args: String[]): Int { return new Sub().twice([1,2,4]) }"
+      assert(Shell.Success(14) == shell.run(src, "None", Array()))
+    }
+    it("forwards a dictionary through an extension call (#3156)") {
+      val src = prelude + ext +
+        "class C { public: def this { }\n def go[T: Numeric](xs: List[T]): T = xs.tot(xs) }\n" +
+        "def main(args: String[]): Int { return new C().go([1,2,4]) }"
+      assert(Shell.Success(7) == shell.run(src, "None", Array()))
+    }
+    it("forwards a dictionary through a ?. extension call (#3156)") {
+      val src = prelude + ext +
+        "class C { public: def this { }\n def go[T: Numeric](xs: List[T]?, ys: List[T]): T? = xs?.tot(ys) }\n" +
+        "def main(args: String[]): Int { val r: Integer? = new C().go([0], [1,2,4])\n return r ?: -1 }"
+      assert(Shell.Success(7) == shell.run(src, "None", Array()))
+    }
+    it("forwards a dictionary to a top-level function called from a class method (#3156)") {
+      val src = prelude +
+        "class D { public: def this { }\n def go[T: Numeric](xs: List[T]): T = sum(xs) }\n" +
+        "def main(args: String[]): Int { return new D().go([1,2,4]) }"
+      assert(Shell.Success(7) == shell.run(src, "None", Array()))
+    }
+    it("forwards a dictionary through a bare call with named arguments (#3156)") {
+      val src = prelude +
+        "class B { public: def this { }\n def go[T: Numeric](xs: List[T]): T = total2[T](xs = xs)\n def total2[T: Numeric](xs: List[T]): T = sum(xs) }\n" +
+        "def main(args: String[]): Int { return new B().go([1,2,4]) }"
+      assert(Shell.Success(7) == shell.run(src, "None", Array()))
+    }
     it("reports a clean error (not a crash) when no instance resolves") {
       assert(Shell.Failure(-1) == shell.run(
         "trait Numeric[T] { def zero(): T }\ndef sum[T: Numeric](xs: List[T]): T { return Numeric[T]::zero() }\ndef main(args: String[]): void { IO::println(sum([1,2,3])) }", "None", Array()))

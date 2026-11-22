@@ -180,7 +180,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
             case MethodFallbackLookup.Error =>
               None
             case MethodFallbackLookup.NotFound =>
-              resolveTopLevelStaticCall(node, params, expected) match {
+              resolveTopLevelStaticCall(node, params, context, expected) match {
                 case Some(term) => Some(term)
                 case None =>
                   calls.reportMethodNotFound(
@@ -450,6 +450,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
   private def resolveTopLevelStaticCall(
     node: AST.UnqualifiedMethodCall,
     params: Array[Term],
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
     bodyContext.topLevelClass match {
@@ -459,7 +460,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         if (methods.length == 1) {
           val method = methods(0)
           val classSubst: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
             expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
             finalParams => new CallStatic(top, method, finalParams)
           )
@@ -541,7 +542,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         }
         val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
               .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)

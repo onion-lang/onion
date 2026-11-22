@@ -48,7 +48,7 @@ private[compiler] final class MemberSelectionTypingSupport(
     // shadowed by a Colls/Iterables extension of the same name.
     calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = false) match {
       case Some(r) => buildResolved(node, resolved, context, r, report = false, allowStaticSelf)
-      case None => calls.tryZeroArgExtensionAccess(node, node.name, resolved.term, resolved.targetType, null)
+      case None => calls.tryZeroArgExtensionAccess(node, node.name, resolved.term, resolved.targetType, context, null)
     }
 
   private def buildResolved(

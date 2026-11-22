@@ -241,21 +241,28 @@ final class ControlExpressionTyping(
 
   /**
    * Branches whose type arguments differ join as their raw class (`[t]` and
-   * `[u]` join as `List`). A raw value passes any `List[T]` target, so a
-   * target that mentions a type variable checks each branch itself: `[u]`
-   * returned as a `List[T]` stays an error, at that branch.
+   * `[u]` join as `List`). A raw value passes any `List[T]` target, so when
+   * there is an applied target each branch is checked against it instead: `[u]`
+   * returned as a `List[T]`, or an `Option[String]` branch assigned to an
+   * `Option[Int]` (#3241), stays an error, at that branch.
    */
-  private[typing] def checkErasedJoinAgainst(expected: Type, join: Type, branchTypes: Seq[Type]): Type =
-    (expected, join) match {
+  private[typing] def checkErasedJoinAgainst(expected: Type, join: Type, branchTypes: Seq[Type]): Type = {
+    def strip(t: Type): Type = t match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    (strip(expected), strip(join)) match {
       case (target: AppliedClassType, raw: ClassType)
           if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty &&
-            TypeCheckingHelpers.containsTypeVariable(target) &&
-            branchTypes.exists {
-              case ap: AppliedClassType => TypeCheckingHelpers.containsTypeVariable(ap)
+            branchTypes.map(strip).exists {
+              case ap: AppliedClassType =>
+                TypeRelations.sameClass(ap.raw, raw) ||
+                  (TypeCheckingHelpers.containsTypeVariable(target) && TypeCheckingHelpers.containsTypeVariable(ap))
               case _ => false
-            } => target
+            } => expected
       case _ => join
     }
+  }
 
   private[typing] def assignBranch(node: AST.Node, term: Term, resultVar: ClosureLocalBinding, resultType: Type): ActionStatement =
     if (term.`type`.isBottomType) {

@@ -283,6 +283,11 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(whoRuns("Int?", "Int", "void") == onion.tools.Shell.Failure(-1))
     }
 
+    // #3053: the same with a reference return, which used to compile and then throw on `null`.
+    it("reports E0068 for `override def f(k: Int): String` over `f(k: Int?)`") {
+      assert(whoRuns("Int?", "Int", "String") == onion.tools.Shell.Failure(-1))
+    }
+
     it("runs `override def f(k: Int?): String` over `f(k: Int): String`") {
       assert(whoRuns("Int", "Int?", "String") == onion.tools.Shell.Success("Up"))
     }
@@ -438,8 +443,9 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(chain("Int", "Int?", "Int") == onion.tools.Shell.Success("CCCCC"))
     }
 
-    it("dispatches a three-level chain `f(Int?)`, `f(Int)`, `f(Int?)` to the last override") {
-      assert(chain("Int?", "Int", "Int?") == onion.tools.Shell.Success("CCCCC"))
+    // #3053: the middle `override def f(x: Int)` over `f(x: Int?)` would unbox a `null`.
+    it("reports E0068 for a chain `f(Int?)`, `f(Int)`, `f(Int?)`: the middle method narrows `Int?`") {
+      assert(chain("Int?", "Int", "Int?") == onion.tools.Shell.Failure(-1))
     }
 
     // Differing only by `?` is the same slot, `override` or not: `override` is a check and
@@ -471,8 +477,9 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(unmarked("Int", "Int?", "String") == onion.tools.Shell.Success("UpUp"))
     }
 
-    it("runs an unmarked `f(k: Int): String` beside a concrete base `f(k: Int?)`") {
-      assert(unmarked("Int?", "Int", "String") == onion.tools.Shell.Success("UpUp"))
+    // #3053: a bridge would unbox, so a `null` through the base threw; it stays an overload.
+    it("keeps an unmarked `f(k: Int): String` an overload beside a concrete base `f(k: Int?)`") {
+      assert(unmarked("Int?", "Int", "String") == onion.tools.Shell.Success("UpBase"))
     }
 
     it("runs an unmarked `handle(code: Int?)` for an interface default `handle(code: Int)`") {
@@ -671,13 +678,29 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(e0068.exists(_.contains("f(Int?): void")), s"got: $results")
     }
 
-    it("still compiles `override def f(k: Int): String` over `f(k: Int?): String`") {
+    // #3053: it compiled, and a `null` through the base then threw inside the bridge.
+    it("reports E0068, naming `f(Int?): String`, for `override def f(k: Int): String` over `f(k: Int?)`") {
       val results = errors(
         """
           |class Base { public: def this {} def f(k: Int?): String = "Base" }
           |class Up extends Base { public: def this {} override def f(k: Int): String = "Up" }
           |""".stripMargin)
-      assert(results.isEmpty, s"got: $results")
+      val e0068 = results.filter(_._1.contains("E0068")).map(_._2)
+      assert(e0068.exists(_.contains("f(Int?): String")), s"got: $results")
+    }
+
+    it("passes a `null` through the base to `f(k: Int?): String` beside an unmarked `f(k: Int): String`") {
+      val result = shell.run(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int): String = "Up" }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { val b: Base = new Up(); val j: Int? = null; return b.f(j) }
+          |}
+          |""".stripMargin,
+        "NullThroughBaseString.on", Array())
+      assert(result == onion.tools.Shell.Success("Base"))
     }
 
     // An unmarked method that takes over a `?`-different base method changes what a call

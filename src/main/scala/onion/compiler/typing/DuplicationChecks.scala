@@ -380,13 +380,13 @@ private[compiler] object DuplicationChecks {
 
   // Whether codegen bridges `impl` to the non-generic base method `c` (the same name, the
   // same parameter types up to `?`), as `BridgeMethodEmitter` does: the return must pass
-  // through, and an own `f(Int)` beside a concrete `f(Int?)` is bridged only with a
-  // reference return, a `null` through the base would otherwise throw (#2896, row 10).
+  // through, and an own `f(Int)` beside a concrete `f(Int?)` is never bridged: a `null`
+  // through the base would throw (#2896 row 10, #3053).
   private def questionOnly(
     basePlainNames: Seq[String], baseReturn: Type, baseArgs: Array[Type], baseConcrete: Boolean, impl: Method
   ): Boolean =
     basePlainNames == plainNames(impl.arguments) && bridgeableReturn(baseReturn, impl.returnType) &&
-      !(baseConcrete && unboxes(impl.arguments, baseArgs) && !referenceCovariant(baseReturn, impl.returnType))
+      !(baseConcrete && unboxes(impl.arguments, baseArgs))
 
   private def unboxes(own: Array[Type], inherited: Array[Type]): Boolean =
     own.indices.exists(i => isPrimitiveJvm(own(i)) && !isPrimitiveJvm(inherited(i)))
@@ -394,9 +394,6 @@ private[compiler] object DuplicationChecks {
   private def isPrimitiveJvm(tp: Type): Boolean =
     val sort = Erasure.asmType(tp).getSort
     sort != org.objectweb.asm.Type.OBJECT && sort != org.objectweb.asm.Type.ARRAY
-
-  private def referenceCovariant(inherited: Type, own: Type): Boolean =
-    !inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own)
 
   /**
    * Reports E0083 when catch clause `index`'s exception type is already covered by an

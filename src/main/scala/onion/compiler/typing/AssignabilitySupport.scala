@@ -58,6 +58,50 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
+  private val boxClasses: Set[String] = Set(
+    "java.lang.Integer", "java.lang.Long", "java.lang.Double", "java.lang.Float",
+    "java.lang.Short", "java.lang.Byte", "java.lang.Character", "java.lang.Boolean"
+  )
+
+  /** A primitive that was boxed to fill a reference slot (`Integer.valueOf(0)`): never null. */
+  private def isBoxedPrimitive(term: Term): Boolean = term match {
+    case c: CallStatic =>
+      c.method.name == "valueOf" && c.parameters.length == 1 && c.parameters(0).isBasicType &&
+        boxClasses.contains(c.method.affiliation.name)
+    case _ => false
+  }
+
+  /**
+   * The fold family (#3209): a static `(xs, initial, f)` whose result is the start value or
+   * a value `f` returned. `getOrDefault`, `requireNonNullElse` and other generic statics are
+   * left out on purpose: their result can also come from a container, so a primitive
+   * argument says nothing about it.
+   */
+  private val foldFamily: Map[String, Set[String]] = Map(
+    "onion.Colls" -> Set("fold", "reduce"),
+    "onion.Iterables" -> Set("foldl")
+  )
+
+  private def isFoldFamilyCall(call: CallStatic): Boolean =
+    call.parameters.length == 3 &&
+      foldFamily.get(call.method.affiliation.name).exists(_.contains(call.method.name))
+
+  /**
+   * Whether every value the lambda body returns is a boxed primitive (`acc + x`, `acc`,
+   * `if c { acc } else { acc + x }`), so it can never be null. A body with any other
+   * statement kind (a loop, a `try`, a `select`) is not inspected and answers false, which
+   * keeps W0015.
+   */
+  private def returnsOnlyBoxedPrimitives(statement: ActionStatement): Boolean = statement match {
+    case b: StatementBlock => b.statements.forall(returnsOnlyBoxedPrimitives)
+    case i: IfStatement =>
+      returnsOnlyBoxedPrimitives(i.thenStatement) &&
+        (i.elseStatement == null || returnsOnlyBoxedPrimitives(i.elseStatement))
+    case r: Return => r.term != null && isBoxedPrimitive(r.term)
+    case _: ExpressionActionStatement => true
+    case _ => false
+  }
+
   private def containsTypeVariable(typeToCheck: Type): Boolean =
     TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
@@ -244,7 +288,24 @@ private[compiler] final class AssignabilitySupport(
             }
           case _ => false
         }
-        if (!isElvis && !isNonNullFunctionCall && !isNonNullTypeArgumentCall) {
+        // A fold (`xs.fold(0) { acc, x -> acc + x }` is `Colls::fold(xs, 0, f)`) whose
+        // start value is a primitive and whose lambda only ever returns a primitive:
+        // the running value is never null, so the unboxing warns about nothing the
+        // reader can act on (#3209). A lambda returning a platform value (`m.get(k)`)
+        // or a function value that is not a lambda keeps W0015.
+        val isPrimitiveFold = actual match {
+          case cast: AsInstanceOf =>
+            cast.target match {
+              case call: CallStatic if isFoldFamilyCall(call) =>
+                isBoxedPrimitive(call.parameters(1)) && (call.parameters(2) match {
+                  case closure: NewClosure => returnsOnlyBoxedPrimitives(closure.block)
+                  case _ => false
+                })
+              case _ => false
+            }
+          case _ => false
+        }
+        if (!isElvis && !isNonNullFunctionCall && !isNonNullTypeArgumentCall && !isPrimitiveFold) {
           // Same reason as the nullToNonNullable call above (#2238): this can
           // be the first warning of the unit.
           bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)

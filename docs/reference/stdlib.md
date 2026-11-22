@@ -1009,19 +1009,20 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  (onion.Colls::reduce,
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
-**`fold`/`reduce`/`foldl` warn on their own most idiomatic use**: `Colls::fold`
-and `Colls::reduce`'s 3-arg form (likewise `Iterables::foldl`) are Java
-generic methods (`<T, R> R fold(List<T>, R, Function2<R, T, R>)`); their
-*declared* return type is the type variable `R` itself -- a boxed reference
-with no Onion-tracked nullability -- regardless of what the call site's own
-arguments pin `R` to. So `xs.fold(0) { a, b -> a + b }` / `xs.reduce(0, (acc,
-x) -> acc + x)` on a `List[Int]`, with a literal zero and an `Int`-returning
-combiner, still unboxes the result through `[W0015]` when assigned to a
-non-null `Int` -- the same warning `Json::getInt` on a possibly-missing key
-gets, even though nothing here can actually be null. There is no
-Onion-native, warning-free alternative for a non-`Double` running total
-(`Stats::sum`/`sumBy` return `Double`); suppress the warning with `--Wno
-platform-unboxing` if the call is intentional.
+**`fold`/`reduce`/`foldl` start from your value, so a primitive start is not null**:
+`Colls::fold` and `Colls::reduce`'s 3-arg form (likewise `Iterables::foldl`) are
+Java generic methods (`<T, R> R fold(List<T>, R, Function2<R, T, R>)`), so their
+declared return type is the type variable `R`. When the initial value is a
+non-null primitive, the result is non-null too, and assigning it to an `Int`
+gives no `[W0015]`:
+
+```onion
+val total: Int = xs.fold(0) { a, b -> a + b }        // no warning
+```
+
+A lambda that returns `null` still gets `[W0012]`, and a nullable initial value
+(`Int?`) is `E0070`, as before. A result that is not seeded by a primitive (for
+example `Json::getInt`) keeps `[W0015]`.
 
 **`first`/`last` are shadowed too, but harmlessly**: `onion.Colls` also
 declares `first(List)`/`last(List)` extensions with the same erased

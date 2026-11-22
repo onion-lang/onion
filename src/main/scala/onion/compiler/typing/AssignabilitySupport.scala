@@ -58,6 +58,12 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
+  /** A primitive that was boxed to fill a reference slot (`Integer.valueOf(0)`): never null. */
+  private def isBoxedPrimitive(term: Term): Boolean = term match {
+    case c: CallStatic => c.method.name == "valueOf" && c.parameters.length == 1 && c.parameters(0).isBasicType
+    case _ => false
+  }
+
   private def containsTypeVariable(typeToCheck: Type): Boolean =
     TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
@@ -244,7 +250,28 @@ private[compiler] final class AssignabilitySupport(
             }
           case _ => false
         }
-        if (!isElvis && !isNonNullFunctionCall && !isNonNullTypeArgumentCall) {
+        // A generic static call whose result type variable is fixed by an argument
+        // that is a primitive (`xs.fold(0) { .. }` is `Colls::fold(xs, 0, f)`, `R`
+        // from `0`): the result starts as that non-null value, and a lambda that
+        // returns null already gets W0012, so the unboxing warns about nothing the
+        // reader can act on (#3209). A nullable `initial` is E0070 before this.
+        val isPrimitiveSeededResult = actual match {
+          case cast: AsInstanceOf =>
+            cast.target match {
+              case call: CallStatic =>
+                call.method.returnType match {
+                  case tv: TypeVariableType if call.method.typeParameters.exists(_.name == tv.name) =>
+                    call.method.arguments.zip(call.parameters).exists {
+                      case (declared: TypeVariableType, arg) if declared.name == tv.name => isBoxedPrimitive(arg)
+                      case _ => false
+                    }
+                  case _ => false
+                }
+              case _ => false
+            }
+          case _ => false
+        }
+        if (!isElvis && !isNonNullFunctionCall && !isNonNullTypeArgumentCall && !isPrimitiveSeededResult) {
           // Same reason as the nullToNonNullable call above (#2238): this can
           // be the first warning of the unit.
           bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)

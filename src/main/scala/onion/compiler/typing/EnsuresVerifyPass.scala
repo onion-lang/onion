@@ -61,8 +61,10 @@ final class EnsuresVerifyPass(
           proved(s"${cls.name}.${m.name}: ${m.ensures.map(onion.compiler.contracts.ExpressionText.of).mkString(" && ")}")
         case HistoryProver.Counterexample(before) =>
           val shown = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
+          // No bindings means the body breaks the ensures for any input (#3265).
+          val when = if (shown.isEmpty) "for every call" else s"for example when $shown"
           report(unit.sourceFile, m.location,
-            s"'${m.name}' can break its ensures: for example when $shown. " +
+            s"'${m.name}' can break its ensures: $when. " +
               "Strengthen its requires or an invariant, weaken the ensures, or fix the body")
         case HistoryProver.Unsupported =>
       }

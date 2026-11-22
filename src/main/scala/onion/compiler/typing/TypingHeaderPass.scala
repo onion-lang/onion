@@ -203,6 +203,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     val node = ClassDefinition.newClass(declaration.location, modifiers, containerClassName, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     node.setResolutionComplete(true) // No inheritance to resolve
+    node.extensionReceiverName = Some(writtenReceiver(declaration.receiverType.desc))
 
     if (typing.table_.lookup(node.name) != null) {
       typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
@@ -243,6 +244,15 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
       imports = imports
     )
     typing.typeAliases_(fqcn) = entry
+  }
+
+  /** The receiver type as the extension block wrote it, for diagnostics (#3009). */
+  private def writtenReceiver(desc: AST.TypeDescriptor): String = desc match {
+    case AST.PrimitiveType(kind) => kind.toString.capitalize
+    case AST.ParameterizedType(c, ps) => writtenReceiver(c) + ps.map(writtenReceiver).mkString("[", ", ", "]")
+    case AST.ArrayType(c) => writtenReceiver(c) + "[]"
+    case AST.NullableType(i) => writtenReceiver(i) + "?"
+    case other => other.toString
   }
 
   private def extractTypeName(typeNode: AST.TypeNode): String = {

@@ -144,4 +144,194 @@ class BridgeOverloadDispatchSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == result)
     }
   }
+
+  // #2680: the exact override may be inherited from a superclass.
+  describe("An inherited exact override beside an own primitive overload (#2680)") {
+    it("runs the inherited n(JInteger) through G[JInteger]") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: JInteger): JInteger = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(2) == result)
+    }
+
+    it("keeps the own n(Int) when nothing inherited is exact") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: String): JInteger = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+
+    it("keeps the own n(Int) when the inherited one returns an unrelated type") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: JInteger): String = "base"
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+
+    it("keeps the own n(Int) when the inherited one returns a supertype of the slot's") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: JInteger): Object = "base"
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+
+    it("keeps the own n(Int) when the inherited one returns a primitive under a String slot") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): String }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: JInteger): Int = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): String = "own"
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4).length()
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(3) == result)
+    }
+
+    it("keeps the own n(Int) when the inherited one is protected") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |protected:
+          |  def n(x: JInteger): JInteger = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+
+    it("runs the inherited final n(JInteger) through a subclass that overrides n(Int)") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  final def n(x: JInteger): JInteger = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |}
+          |class E extends D {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): JInteger = 7
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new E
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(2) == result)
+    }
+
+    it("keeps the own n(Int) when a nearer superclass redeclares n(JInteger) abstract") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class A {
+          |public:
+          |  def this {}
+          |  def n(x: JInteger): JInteger = 2
+          |}
+          |abstract class M extends A {
+          |public:
+          |  def this {}
+          |  abstract def n(x: JInteger): JInteger
+          |}
+          |class D extends M conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+  }
 }

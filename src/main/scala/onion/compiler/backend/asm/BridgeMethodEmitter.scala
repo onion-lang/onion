@@ -86,7 +86,13 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
             else
               def exactCount(m: TypedAST.Method): Int =
                 m.arguments.indices.count(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name)
-              Some(candidates.reduceLeft((a, b) => if exactCount(b) > exactCount(a) then b else a))
+              val best = candidates.reduceLeft((a, b) => if exactCount(b) > exactCount(a) then b else a)
+              // A generic supertype's slot is implemented by an inherited exact override
+              // too (`Base.n(x: JInteger)` for `G[JInteger].n(x: T)`), which beats an own
+              // overload that only matches by boxing (`n(x: Int)`), as in Java (#2680).
+              if subst.nonEmpty && exactCount(best) < specializedArgs.length then
+                inheritedExact(classDef, rawMethod, specializedArgs, substituteClassParams(rawMethod.returnType)).orElse(Some(best))
+              else Some(best)
 
           implOpt.foreach { impl =>
             // In an interface only a default method (one with a body) has code to bridge to.
@@ -98,7 +104,9 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
               val implDesc = methodDesc(impl.returnType, impl.arguments)
               if bridgeDesc != implDesc && !emitted.contains((rawMethod.name, bridgeDesc)) then
                 emitted.add((rawMethod.name, bridgeDesc))
-                val access = toAsmModifier(impl.modifier) | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
+                // Never final, as in javac: a subclass may bridge the same slot again,
+                // and a `final` impl (inherited or own) must not freeze the bridge (#2680).
+                val access = (toAsmModifier(impl.modifier) & ~Opcodes.ACC_FINAL) | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
                 val bridgeArgTypes = rawMethod.arguments.map(asmType)
                 val bridgeReturnType = asmType(rawMethod.returnType)
                 val gen = MethodEmitter.newGenerator(cw, access, rawMethod.name, bridgeReturnType, bridgeArgTypes)
@@ -129,6 +137,30 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.returnValue()
                 gen.endMethod()
           }
+
+  // The nearest superclass method with exactly these parameter types, if it can
+  // implement `slot` (as Java requires): concrete, at least as accessible, and returning what the
+  // slot returns or a subtype (`slotReturn`, the slot's return at the type arguments).
+  // One that cannot leaves the own overload chosen, rather than a bridge the JVM rejects.
+  private def inheritedExact(
+    classDef: ClassDefinition, slot: TypedAST.Method, args: Array[TypedAST.Type], slotReturn: TypedAST.Type
+  ): Option[TypedAST.Method] =
+    var sup: TypedAST.ClassType = if classDef.isInterface then null else classDef.superClass
+    while sup != null do
+      val hit = rawOf(sup).methods.find { m =>
+        m.name == slot.name && isVisibleInstance(m) &&
+          m.arguments.length == args.length &&
+          m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(args(i)).name)
+      }
+      // The nearest match decides, even an abstract one: it hides any farther body.
+      if hit.isDefined then
+        return hit.filter { m =>
+          !Modifier.isAbstract(m.modifier) &&
+          (Modifier.isPublic(m.modifier) || !Modifier.isPublic(slot.modifier)) &&
+            isBridgeableReturn(slotReturn, m.returnType)
+        }
+      sup = rawOf(sup).superClass
+    None
 
   private type Slot = (String, String)
   // A slot's declaring method, and the method whose code runs for it (None = abstract).

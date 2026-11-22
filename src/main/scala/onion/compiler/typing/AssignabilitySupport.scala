@@ -68,6 +68,20 @@ private[compiler] final class AssignabilitySupport(
   private def structurallyAssignable(expected: Type, actual: Type): Boolean =
     AssignabilitySupport.structurallyAssignable(expected, actual, bodyContext.table)
 
+  /** For the rewriter's `bind` lambda of a `do[M]` bind: where to report, and the monad types it
+    * returns (expected, actual), when both are `Function1[A, R]` applications. */
+  private def doBindMismatch(node: AST.Node, expected: Type, actual: Type): Option[(AST.Node, Type, Type)] = {
+    def result(t: Type): Option[Type] = t match {
+      case a: TypedAST.AppliedClassType if a.raw.name == "onion.Function1" && a.typeArguments.length == 2 => Some(a.typeArguments(1))
+      case _ => None
+    }
+    node match {
+      case c: AST.ClosureExpression if c.isDoBind && c.body.elements.nonEmpty =>
+        for (e <- result(expected); a <- result(actual)) yield (c.body.elements.last: AST.Node, e, a)
+      case _ => None
+    }
+  }
+
   def processAssignable(node: AST.Node, expected: Type, actual: Term, suppressNullWarning: Boolean = false): Term = {
     if (actual == null) return null
     // Target-type an empty collection literal ([] / [:]) to the expected
@@ -273,6 +287,12 @@ private[compiler] final class AssignabilitySupport(
                (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)
                 else TypeRelations.isAssignableWithBoxing(expected, nullable.innerType, bodyContext.table)) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
+        // `a <- p(); b <- q(a); yield ..` with two error types: the bind lambda for `a` returns what
+        // the rest of the block builds. Name the monad values, at the clause that built the odd
+        // one, not the `Function1` the desugaring made up (#2670).
+        case _ if doBindMismatch(node, expected, actual.`type`).isDefined =>
+          val (at, want, got) = doBindMismatch(node, expected, actual.`type`).get
+          bodyContext.report(INCOMPATIBLE_TYPE, at, want, got, SemanticErrorReporter.DoBindErrorTypeHint)
         case _ if expected == BasicType.BYTE && ConstantNarrowing.isHexEndingInB(actual) =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`, SemanticErrorReporter.HexDigitBHint)
         case _ =>
@@ -313,6 +333,27 @@ private[compiler] object AssignabilitySupport {
       actual == null || actual.isBasicType || actual.isNullType || actual.isBottomType ||
       TypeRules.emptyCollectionLiteralAccepts(slot, arg) ||
       fitsWithoutConversion(slot, actual, table)
+  }
+
+  /**
+   * Whether a lambda typed to `term` may fill `slot`, a class type variable's slot such as
+   * `() -> T`: the assignment rule of `typeVariableSlotFits`, so `() -> 5` is not a `() -> T`
+   * (#3018). A lambda whose result is free also fits, since that result takes the slot's type:
+   * one that never returns (`() -> throw ...`, `Function0[Nothing]`), and one whose only value
+   * is `null` (`() -> { log(); null }`, widened to `Function0[Object]`), as `() -> null` into
+   * `() -> T?` always did (#3003).
+   */
+  def lambdaSlotFits(slot: Type, term: Term, table: ClassTable): Boolean =
+    typeVariableSlotFits(slot, term, table) || lambdaResultIsFree(term)
+
+  def lambdaResultIsFree(term: Term): Boolean = term match {
+    case c: NewClosure =>
+      c.producesOnlyNull || (c.`type` match {
+        case applied: AppliedClassType => applied.typeArguments.lastOption.exists(_.isBottomType)
+        case _ => false
+      })
+    case b: Begin if b.terms.nonEmpty => lambdaResultIsFree(b.terms.last)
+    case _ => false
   }
 
   // `nested` is true inside a type-argument comparison, where type arguments are

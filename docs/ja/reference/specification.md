@@ -720,6 +720,12 @@ def main(cmd: String, files: String[]): void { ... } // スカラーの接頭列
 エラーです。唯一のパラメータ（生の argv）か、最後のパラメータ（rest コレクタ）の
 どちらかでなければなりません。
 
+rest コレクタは `List[String]` とも書けます
+（`def main(cmd: String, files: List[String])`）。集める引数は同じで、
+リストとして受け取ります。`String[]` と同じく、唯一のパラメータにもできます
+（`def main(files: List[String])` はすべての引数を受け取ります）。
+既定値は付けられません。位置が違うもの・既定値付きのものは E0095 です。
+
 ## 警告
 
 `--warn off|on|error` でレベルを設定します。`--Wno codes` で特定の警告を抑制します。

@@ -1108,6 +1108,8 @@ public class JJOnionParser implements Parser {
       JJOnionParser exprParser = interpolationParser(padding + exprStr);
       try {
         AST.Expression expr = exprParser.term();
+        // A call left over after the term, as `(2)` in `#{ (1)(2) }`, is an error (#3166)
+        if (exprParser.getToken(1).kind == LPAREN) throw new ParseException("Unexpected input in string interpolation");
         needsBodyRewrite |= exprParser.needsBodyRewrite;
         append(expressions, expr);
       } catch (Exception e) {
@@ -1178,6 +1180,8 @@ public class JJOnionParser implements Parser {
       JJOnionParser exprParser = interpolationParser(padding + exprStr);
       try {
         AST.Expression expr = exprParser.term();
+        // A call left over after the term, as `(2)` in `#{ (1)(2) }`, is an error (#3166)
+        if (exprParser.getToken(1).kind == LPAREN) throw new ParseException("Unexpected input in string interpolation");
         needsBodyRewrite |= exprParser.needsBodyRewrite;
         append(expressions, expr);
       } catch (Exception e) {

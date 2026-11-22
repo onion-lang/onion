@@ -713,3 +713,62 @@ IO::println(g("a" as CharSequence))    // 以前も現在も charseq
   どちらか一方の多重定義しか当てはまらない呼び出しです。
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。
+
+## `null` 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)
+
+期待される型がない `[x, null]` は、以前は non-null 型のリストでした。
+現在は nullable 型のリストになり、`null` がチェッカーから見えるようになりました。
+
+```onion
+val ys = ["a", null]
+IO::println(ys[0].length())     // 以前: 1。現在: E0070
+IO::println(ys[0]?.length())    // 以前も現在も 1
+```
+
+| プログラム | 以前 | 現在 | 直し方 |
+|---|---|---|---|
+| `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` または `ys[0]!!.length()` |
+| `total(xs: List[Int])` に対する `total([1, null])` | コンパイルでき、`null` で実行時エラー | E0005 | `List[Int?]` を受け取り、各 `null` を処理する |
+| `xs = [1, null]` のとき `val n: Int = xs[1]` | コンパイルでき、`null` で実行時エラー | E0070 | `xs[1] ?: 0` |
+| `String::join(",", ["a", null, "c"])` | `a,null,c` | E0005 | `String::join(",", ["a", null, "c"].map { s -> s ?: "null" })` |
+| `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | 内側のリストの要素型をそろえる |
+| `["a", null] + ["b"]` | コンパイルできた | E0001 | 両方を `List[String?]` にそろえる |
+| `xs = ["b", null, "a"]` のとき `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` | `[null, a, b]` | E0005 | 要素型を一度だけ書く: `Comparator::naturalOrder[String?]()` |
+| 同じ `xs` で `xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))` | `[null, a, b]` | E0005 | `String?` を比べる比較器にする: `Comparator::nullsFirst[String?]((a, b) -> a!!.compareToIgnoreCase(b!!))` |
+
+- **表示されるもの:** E0070（`may be null and cannot be dereferenced directly`）です。`List[Int]` の変数に代入した場合は E0000 です。`List[Int]` の引数や、`xs.sort(comparator)`・`Collections::sort(xs, comparator)`・`String::join` などの Java のジェネリックメソッドに渡した場合は E0005 です。原因はリテラル中の `null` です。
+- **要素型に対する Java の比較器:** `nullsFirst` は、包んだ比較器に `null` を渡しません。しかし、そのシグネチャではそれを表せません。上の二つの `sort` の行のように、型引数 `String?` を一度だけ書きます。そこでの `!!` が失敗することはありません。
+- **型を明示すれば今までどおり書けます:** `val ys: List[Int?] = [1, null]`。`null` が入らないため `List[Int]` は拒否されます。
+- **変わらないもの:** `[null]`、`[null, null]`、期待される型が分かっているリテラルです。
+- **残っている差:** `["a": "x", "b": null]` のように `null` の値を含むマップリテラルは、今も non-null の値型になります。これは #3201 で、別の変更として移行表の行も別に用意します。
+- **`onion migrate` の規則はありません:** `null` をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。
+
+## `f(x)` と `f(xs...)` に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)
+
+配列に `f(x)` と `f(xs...)` の両方が当てはまるとき、以前の Onion は可変長引数の方を外していました。
+Java はその配列を可変長引数の配列そのものとして扱い、`f(xs...)` を選びます。
+Onion も同じ動作になりました。
+
+```onion
+import { java.util.List as JList }
+val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+IO::println(JList::of(sa).size())             // 以前: 1。現在: 3
+IO::println(JList::of[String[]](sa).size())   // 以前も現在も 1
+```
+
+| 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|
+| `JList::of(sa).size()`、`JSet::of(sa).size()` | `1` | `3` | `JList::of[String[]](sa)` |
+| `Stream::of(sa).count()` | `1` | `3` | `Stream::of[String[]](sa)` |
+| `val n: List[String[]] = JList::of(sa)` | コンパイルできた | E0000 | `JList::of[String[]](sa)` |
+| `s(o: Object)` と `s(xs: Object...)` がある `H::s(sa)` | `s(Object)` | `s(Object...)` | `H::s(sa as Object)` |
+| `ia: Int[]` と、`a(o: Object)`・`a(xs: Object...)` がある `h.a(ia)` | `a(Object...)` | `a(Object)` | `ia` を入れた `Object[]` を渡す: `val w: Object[] = new Object[1]; w[0] = ia; h.a(w)` |
+
+- **表示されるもの:** 多くの場合は何も表示されず、別のメソッドが実行されます。
+  `List[String[]]` と宣言した変数では E0000（`type List[String[]] is expected, but type List[String] is used`）になります。
+- **`Int[]` が逆向きに変わる理由:** `Int[]` は `Object[]` ではありません。
+  そのため Java と同じく、`a(o: Object)` にしか当てはまりません。
+- **今までどおり動くもの:** 配列でない引数 1 個（`s("x")` は `s(Object)`）、引数が複数の呼び出し
+  （`s("x", "y")` は `s(Object...)`）、`s(null)` です。
+- **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、要素 1 個のつもりか配列全体のつもりかは書いた人にしか分かりません。表に各書き換えを示します。

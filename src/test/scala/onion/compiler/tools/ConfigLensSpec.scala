@@ -104,6 +104,27 @@ class ConfigLensSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, r.toString)
     }
 
+    it("keeps a leading BOM through an edit and an unedited render (#3035)") {
+      val r = shell.run(decl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val dir = java.nio.file.Files::createTempDirectory("lens-spec").toString()
+          |    val p = dir + "/bom.conf"
+          |    val bom = "\uFEFF"
+          |    java.nio.file.Files::write(java.nio.file.Paths::get(p), (bom + "host = a\nport = 1\ndebug = false\n").getBytes("UTF-8"))
+          |    val lens = file(p).readLossless(Server::cfg()).get()
+          |    if lens.value().host() != "a" { return 1 }
+          |    if lens.render() != bom + "host = a\nport = 1\ndebug = false\n" { return 2 }
+          |    val out = lens.edit { v -> v.copy(port = 2) }.render()
+          |    if out != bom + "host = a\nport = 2\ndebug = false\n" { return 3 }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(0) == r, r.toString)
+    }
+
     it("reports an unreadable file as a defect, not an exception") {
       val r = shell.run(decl +
         """class Test {

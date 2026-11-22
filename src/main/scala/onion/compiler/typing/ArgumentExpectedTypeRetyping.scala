@@ -215,11 +215,33 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
               TypeRules.isAssignable(formal, term.`type`) =>
             if (updated == null) updated = params.clone()
             updated(i) = term
+          case _ if typing.suppressedErrorCount != errorsBefore && originalFitsSilently(callNode, method, params, classSubst, target) =>
+            // The original lambda's results joined to a raw type (`Option[String]` and
+            // `Option[Int]` -> `Option`) that fits the target, so it reports nothing and the
+            // muted error is the only one there is: report it, at the `return` (#3117).
+            calls.typed(args(i), context, formal)
           case _ =>
         }
       }
     }
     if (updated == null) params else updated
+  }
+
+  /** Whether the call, with its arguments as first typed, yields a result the target accepts. */
+  private def originalFitsSilently(
+    callNode: AST.Node,
+    method: Method,
+    params: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    target: Type
+  ): Boolean = {
+    val errorsBefore = typing.suppressedErrorCount
+    val subst = typing.withSuppressedReporting {
+      GenericMethodTypeArguments.inferWithoutDefaults(typing, callNode, method, params, classSubst, target)
+    }
+    if (typing.suppressedErrorCount != errorsBefore) return false
+    val result = TypeSubstitution.substituteType(method.returnType, classSubst, subst, defaultToBound = true)
+    result != null && TypeRules.isAssignable(target, result)
   }
 
   private def mentionsAny(t: Type, names: Set[String]): Boolean = t match {

@@ -81,6 +81,22 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term], target: Term = null): Boolean =
     selectApplicableExtensionMethod(targetType, name, params, isBoxedPrimitive(target)).isInstanceOf[CandidateSelection.Ambiguous[?]]
 
+  /**
+   * A receiver whose type arguments are all `?`, as a join of `List[Int]` and `List[String]`
+   * is (#3255), is read at their bounds for an extension call: `j.map { x -> .. }` sees an
+   * `Object` element, as it did on the raw join.
+   */
+  private def wildcardsAtBound(node: AST.Node, target: Term, targetType: ObjectType): Option[(Term, ObjectType)] =
+    targetType match {
+      case ap: AppliedClassType if ap.typeArguments.nonEmpty && ap.typeArguments.forall {
+            case w: WildcardType => w.lowerBound.isEmpty
+            case _ => false
+          } =>
+        val read = AppliedClassType(ap.raw, ap.typeArguments.toList.map(_.asInstanceOf[WildcardType].upperBound))
+        Some((new AsInstanceOf(node.location, target, read), read))
+      case _ => None
+    }
+
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
@@ -89,6 +105,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type,
     reportIfNotFound: Boolean = true
   ): Option[Term] = {
+    wildcardsAtBound(node, target, targetType) match {
+      case Some((t, tt)) => return tryExtensionMethodCall(node, t, tt, params, expected, reportIfNotFound)
+      case None =>
+    }
     selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.NoMatch if arrayAsList(node, target, targetType).isDefined =>
         val (listTarget, listType) = arrayAsList(node, target, targetType).get
@@ -502,6 +522,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type,
     untypedClosureIndices: Set[Int]
   ): Option[Term] = boundary {
+    wildcardsAtBound(node, target, targetType) match {
+      case Some((t, tt)) => break(tryExtensionMethodCallBidirectional(node, t, tt, context, expected, untypedClosureIndices))
+      case None =>
+    }
     val name = node.name
     val args = node.args.toArray
 

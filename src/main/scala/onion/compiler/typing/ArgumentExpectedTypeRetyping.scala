@@ -64,8 +64,11 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
   ): Option[Array[Term]] = {
     if (params == null || params.isEmpty) return None
     // Only worth trying when some argument is re-typeable to a more precise type.
+    // A branching argument too: `f(if b { some(1) } else { none() })` gives `none()`
+    // the parameter's type, and an `Option[String]` branch passed for an `Option[Int]`
+    // is an error at that branch, as for a typed `val` (#3255).
     val malleableIndices = args.zipWithIndex.collect {
-      case (expr, i) if i < params.length && isMalleable(expr) => i
+      case (expr, i) if i < params.length && (isMalleable(expr) || isBranching(expr)) => i
     }
     if (malleableIndices.isEmpty) return None
 
@@ -89,7 +92,21 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     val updated = params.clone()
     for (i <- malleableIndices if i < expectedArgTypes.length) {
       val expectedType = expectedArgTypes(i)
-      if (expectedType != null) {
+      if (expectedType != null && isBranching(args(i))) {
+        if (!TypeCheckingHelpers.containsTypeVariable(expectedType)) {
+          val errorsBefore = typing.suppressedErrorCount
+          val retyped = retypeArgument(args(i), context, expectedType)
+          val muted = typing.suppressedErrorCount != errorsBefore
+          retyped match {
+            case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
+              // A branch that does not fit the only candidate's parameter is the one error:
+              // report it there, and pass the call, so no E0005 names the join.
+              updated(i) = if (muted) calls.typed(args(i), context, expectedType).getOrElse(term) else term
+              changed = true
+            case _ =>
+          }
+        }
+      } else if (expectedType != null) {
         retypeArgument(args(i), context, expectedType) match {
           case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
             updated(i) = term
@@ -221,6 +238,14 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
             // `Option[Int]` -> `Option`) that fits the target, so it reports nothing and the
             // muted error is the only one there is: report it, at the `return` (#3117).
             calls.typed(args(i), context, formal)
+          case _ if typing.suppressedErrorCount != errorsBefore && resultIsWildcardJoin(params(i).`type`) =>
+            // The results joined to `Option[?]` (#3255), which the target rejects at the
+            // call. The muted error is the precise one: report it at the branch, and pass
+            // the call the re-typed lambda, so the call adds no second error.
+            calls.typed(args(i), context, formal).foreach { term =>
+              if (updated == null) updated = params.clone()
+              updated(i) = term
+            }
           case _ =>
         }
       }
@@ -243,6 +268,20 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     if (typing.suppressedErrorCount != errorsBefore) return false
     val result = TypeSubstitution.substituteType(method.returnType, classSubst, subst, defaultToBound = true)
     result != null && TypeRules.isAssignable(target, result)
+  }
+
+  /** A function type whose result is a join of different type arguments, such as `() -> Option[?]`. */
+  private def resultIsWildcardJoin(t: Type): Boolean = t match {
+    case fn: AppliedClassType if fn.typeArguments.nonEmpty =>
+      fn.typeArguments.last match {
+        case ap: AppliedClassType =>
+          ap.typeArguments.nonEmpty && ap.typeArguments.forall {
+            case w: WildcardType => w.lowerBound.isEmpty
+            case _ => false
+          }
+        case _ => false
+      }
+    case _ => false
   }
 
   private def mentionsAny(t: Type, names: Set[String]): Boolean = t match {

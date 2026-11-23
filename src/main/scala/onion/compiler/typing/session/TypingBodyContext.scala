@@ -17,6 +17,7 @@ final class TypingBodyContext(
   val warningReporter: WarningReporter,
   private val topLevelClassProvider: () => Option[ClassType] = () => None,
   private val problemCountProvider: () => Int = () => 0,
+  private val dropProblemsProvider: Int => Unit = _ => (),
   private val unitProvider: () => AST.CompilationUnit = () => null,
   /** Whether contract clauses are accepted (RFC #2557); `Off` makes a clause an error. */
   val contractMode: ContractMode = ContractMode.Off,
@@ -75,6 +76,9 @@ final class TypingBodyContext(
    *  errored" apart from "no overload matched", so a redundant outer
    *  method-not-found can be suppressed (issue #316). */
   def problemCount: Int = problemCountProvider()
+
+  /** Forgets every error reported since the `start` checkpoint of [[problemCount]]. */
+  def dropProblemsSince(start: Int): Unit = dropProblemsProvider(start)
 }
 
 object TypingBodyContext {
@@ -92,6 +96,7 @@ object TypingBodyContext {
       warningReporter = typing.warningReporter_,
       topLevelClassProvider = () => typing.loadTopClass,
       problemCountProvider = () => typing.problemCount,
+      dropProblemsProvider = start => typing.reporter_.dropProblemsSince(start)(_ => true),
       unitProvider = () => unitContext.unit,
       contractMode = typing.contractMode,
       reportRetiredSelfNode = typing.reportRetiredSelf

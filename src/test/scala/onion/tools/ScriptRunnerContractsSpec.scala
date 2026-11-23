@@ -245,6 +245,38 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
 
+  // A superclass `history` binds its subclasses: a method of `Sub` that writes the inherited field is
+  // guarded like one of `Base` (#2731).
+  private def inherited(arg: String) =
+    s"""class Base {
+       |  history n >= old(n)
+       |protected:
+       |  var n: Int
+       |public:
+       |  def this { n = 10 }
+       |  def get(): Int = n
+       |}
+       |class Sub extends Base {
+       |public:
+       |  def this { }
+       |  def set(m: Int): void { n = m }
+       |}
+       |val s = new Sub()
+       |s.set(Integer::parseInt("$arg"))
+       |println(s.get())
+       |""".stripMargin
+
+  test("--contracts runtime: a subclass method that breaks an inherited history throws (#2731)"):
+    val path = writeScript(inherited("3"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts runtime: a subclass method that keeps an inherited history runs (#2731)"):
+    val path = writeScript(inherited("12"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("12")
+
   test("--contracts runtime: a setter whose parameter shares the field's name keeps a history that holds"):
     val path = writeScript(setter("12"))
     val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))

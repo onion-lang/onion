@@ -47,7 +47,7 @@ private[compiler] final class MethodBodySupport(
       bodyContext.warningReporter.report(WarningCategory.ContractTrusted, block.location,
         s"the contract of '${method.name}' is trusted, not verified: its body is not checked, and callers rely on it")
     val definition = method.classType match { case d: ClassDefinition => Some(d); case _ => None }
-    val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty)
+    val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty || inheritedHistorySources(d).nonEmpty)
     // A public instance method of a class with an `invariant` or a `history` is a place where it must
     // hold, so it is guarded too (RFC #2557, design 7.4). A constructor is not a method here.
     val isStatic = (method.modifier & AST.M_STATIC) != 0
@@ -68,6 +68,11 @@ private[compiler] final class MethodBodySupport(
     }
     reportUnused(context)
   }
+
+  /** The `history` clauses of the classes `definition` extends, nearest first (#2731). */
+  private def inheritedHistorySources(definition: ClassDefinition): List[AST.Expression] =
+    Iterator.iterate(definition.superClass)(_ match { case d: ClassDefinition => d.superClass; case _ => null })
+      .takeWhile(_ != null).collect { case d: ClassDefinition => d.historySources }.flatten.toList
 
   /** W0026: a clause that `--contracts runtime` does not enforce. Never silent. */
   private def warnNotGuarded(method: MethodDefinition, at: AST.Node, why: String): Unit =
@@ -135,6 +140,15 @@ private[compiler] final class MethodBodySupport(
     // Its names are the object's fields, so a parameter with a field's name is hidden from it (#2633).
     val historyTerms = if (isStatic) Nil else
       gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(definition.historySources, gctx, ContractScope.History))
+    // A superclass's `history` binds its subclasses too (#2731). It was written against the
+    // superclass, so one that cannot be read from here (a private field) is left out, silently:
+    // a subclass method cannot write what it cannot name.
+    val inheritedTerms: Seq[ActionStatement] = if (isStatic) Nil else inheritedHistorySources(definition).flatMap { s =>
+      val start = bodyContext.problemCount
+      val terms = gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(List(s), gctx, ContractScope.History))
+      if (bodyContext.problemCount != start) { bodyContext.dropProblemsSince(start); Nil }
+      else terms.map(t => guard(t, s, "history"))
+    }
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
     val ensuresGuards: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
@@ -146,7 +160,7 @@ private[compiler] final class MethodBodySupport(
         val g = guard(t, s, "history")
         definition.historyGuards((method.name, onion.compiler.contracts.ExpressionText.of(s))) = g.asInstanceOf[IfStatement]
         g
-      }
+      } ++ inheritedTerms
     // `old(e)` is e on entry: assigned after `requires` holds and before the body runs.
     val saved: Seq[ActionStatement] = saves.toSeq.map { case (slot, term) =>
       new ExpressionActionStatement(term.location, new SetLocal(0, slot, term.`type`, term))

@@ -82,6 +82,10 @@ class TextSpec extends AbstractShellSpec {
       assert(wrapped("彼は「はい」と言った。", 6) == "彼は|「は|い」と|言っ|た。")
     }
 
+    it("moves an opening bracket that ends a space-separated word to the next line (#3058)") {
+      assert(wrapped("あいう「 えお", 4) == "あい|う|「え|お")
+    }
+
     it("measures spaced Japanese words in columns") {
       assert(wrapped("日本語 の 単語 を 空白 で", 10) == "日本語 の|単語 を 空|白 で")
     }

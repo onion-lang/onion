@@ -31,3 +31,17 @@ class JsonDefaultedAccessorSpec extends AbstractShellSpec {
     assert(Shell.Success("kota:7") == result)
   }
 }
+
+class JsonValueAsIntSpec extends AbstractShellSpec {
+  it("asInt/asLong give 0 for a fraction or an out-of-range number, not a truncated or wrapped one (#2995)") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   val v = Json::value("{\"n\": 3.7, \"big\": 10000000000, \"ok\": 7, \"whole\": 4.0, \"bigL\": 10000000000, \"frac\": 1.5}")
+        |   return "" + v.get("n").asInt() + ":" + v.get("big").asInt() + ":" + v.get("ok").asInt() + ":" + v.get("whole").asInt() +
+        |     ":" + v.get("bigL").asLong() + ":" + v.get("frac").asLong() + ":" + v.get("none").asInt()
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("0:0:7:4:10000000000:0:0") == result)
+  }
+}

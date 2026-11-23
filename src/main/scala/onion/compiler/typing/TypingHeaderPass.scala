@@ -2,7 +2,7 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
-import onion.compiler.toolbox.Paths
+import onion.compiler.toolbox.{Message, Paths}
 import onion.compiler.typing.session.NameResolutionContext
 import onion.compiler.typing.session.TypingUnitContext
 
@@ -148,6 +148,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     } else {
       if (declaration.loweredInstance.isDefined) typing.loweredInstanceNames += node.name
       typing.table_.classes.add(node)
+      typing.classDeclaringFiles(node.name) = unit.sourceFile
       typing.put(declaration, node)
       typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))
     }
@@ -203,6 +204,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     val node = ClassDefinition.newClass(declaration.location, modifiers, containerClassName, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     node.setResolutionComplete(true) // No inheritance to resolve
+    node.extensionReceiverName = Some(writtenReceiver(declaration.receiverType.desc))
 
     if (typing.table_.lookup(node.name) != null) {
       typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
@@ -245,6 +247,15 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     typing.typeAliases_(fqcn) = entry
   }
 
+  /** The receiver type as the extension block wrote it, for diagnostics (#3009). */
+  private def writtenReceiver(desc: AST.TypeDescriptor): String = desc match {
+    case AST.PrimitiveType(kind) => kind.toString.capitalize
+    case AST.ParameterizedType(c, ps) => writtenReceiver(c) + ps.map(writtenReceiver).mkString("[", ", ", "]")
+    case AST.ArrayType(c) => writtenReceiver(c) + "[]"
+    case AST.NullableType(i) => writtenReceiver(i) + "?"
+    case other => other.toString
+  }
+
   private def extractTypeName(typeNode: AST.TypeNode): String = {
     typeNode.desc match {
       case AST.ReferenceType(name, _) => name.replace(".", "_")
@@ -271,11 +282,18 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     // Two scripts with the same file name (d1/x.on, d2/x.on) would both become `xMain`.
     val existing = typing.table_.lookup(typing.topClass)
     if (existing != null) {
-      val other = typing.topLevelContainerOwners.get(typing.topClass).map(_.sourceFile).getOrElse(
-        existing match { case cd: ClassDefinition => cd.getSourceFile; case _ => "another file" })
-      typing.report(SemanticError.DUPLICATE_CLASS, unit.location,
-        typing.topClass + " (the top-level code of " + unit.sourceFile + " and of " +
-          other + " would both become this class; rename one file)")
+      typing.topLevelContainerOwners.get(typing.topClass) match {
+        case Some(owner) =>
+          typing.report(SemanticError.DUPLICATE_CLASS, unit.location,
+            typing.topClass + " " + Message("error.semantic.duplicatedClass.sameNameScripts", unit.sourceFile, owner.sourceFile))
+        case None =>
+          // A class declared in another file has the container's name (#3060): say which file.
+          val declaring = typing.classDeclaringFiles.getOrElse(typing.topClass,
+            existing match { case cd: ClassDefinition => cd.getSourceFile; case _ => "another file" })
+          typing.report(SemanticError.DUPLICATE_CLASS, unit.location,
+            typing.topClass + " " + Message("error.semantic.duplicatedClass.scriptAndClass", unit.sourceFile, declaring))
+          typing.scriptOverClassNames.add(typing.topClass)
+      }
       typing.duplicateScriptUnits.add(unit)
       return
     }

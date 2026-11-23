@@ -982,25 +982,25 @@ are not checked.
 
 A top-level auto-CLI `main` parameter's type is neither a supported scalar (`String`,
 `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`) nor, as the last
-parameter, a `String[]` rest collector.
+parameter, a `String[]` or `List[String]` rest collector.
 
 ```onion
-def main(name: String, count: Int = 3, tags: List[String] = []): Int {
+def main(name: String, count: Int = 3, opts: Map[String, String] = [:]): Int {
   return 0
 }
-// E0094: `main` cannot derive a command line: parameter `tags` has type
-//        List[String], which cannot be read from an argument.
+// E0094: `main` cannot derive a command line: parameter `opts` has type
+//        Map[String,String], which cannot be read from an argument.
 ```
 
-Use a scalar, or `String[]` as the last parameter to collect repeated/trailing
-arguments (e.g. `def main(cmd: String, files: String[])`).
+Use a scalar, or `String[]` or `List[String]` as the last parameter to collect
+trailing arguments (e.g. `def main(cmd: String, files: List[String])`).
 
 A varargs parameter (`files: String...`) is E0094 too: write `files: String[]`. A `tool`
 reports the same mistake as `E0081`.
 
-### `E0095` — `main`'s `String[]` parameter is misplaced
+### `E0095` — `main`'s `String[]` or `List[String]` parameter is misplaced
 
-A top-level auto-CLI `main` has a `String[]` parameter that is not in a supported
+A top-level auto-CLI `main` has a `String[]` or `List[String]` parameter that is not in a supported
 position: not the only parameter (raw argv) and not the last parameter (a rest
 collector preceded only by required scalars).
 
@@ -1012,8 +1012,10 @@ def main(args: String[], flag: Boolean = false): void {
 //        position.
 ```
 
-A `String[]` parameter must be either the only parameter, or the last parameter
-with no default value, preceded only by required (no-default) scalar parameters.
+Such a parameter must be either the only parameter, or the last parameter with no
+default value, preceded only by required (no-default) scalar parameters. A defaulted
+`List[String]` (`tags: List[String] = []`) is E0095 too: drop the default, since an
+empty rest is already an empty list.
 
 ## Try/catch errors
 
@@ -2032,7 +2034,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0013` | suspicious string interpolation syntax |
 | `W0014` | top-level statements ignored because a main is defined |
 | `W0015` | boxed platform value implicitly unboxed to a non-null primitive |
-| `W0016` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
+| `W0016` | `@TailRecursive` annotation present but the method or its mutual-recursion group could not be optimized |
 | `W0017` | a library jar's `META-INF/onion/effect-table.txt` is malformed and was ignored whole (reported at the jar and line) |
 | `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
@@ -2045,6 +2047,8 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0026` | a contract clause is not enforced at run time by `--contracts runtime`, with the reason (a warning, so a clause that is not guarded is never silent) |
 | `W0027` | the contract of a method is trusted, not verified (`@Trusted`): its body is not checked and callers rely on it; each use is listed |
 | `W0028` | a method can break its `ensures`: the solver found values for which the body ends with the clause false |
+| `W0029` | a method without `override` overrides an inherited method that differs from it only by `?` (`dec(k: Int?)` beside `Base.dec(k: Int)`), so a call through the base type runs it. Add `override`, or rename it to keep a separate method |
+| `W0030` | a method without `override` looks like an override of an inherited method that differs from it only by `?`, but is an overload (`dec(k: Int)` beside `Base.dec(k: Int?)`), so a call through the base type runs the base method. Make the parameter nullable (`Int?`) to override, or rename it to keep a separate method |
 
 ## Every diagnostic code
 
@@ -2142,7 +2146,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0092` | cannot instantiate primitive type … with `new` |
 | `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 | `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
-| `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
+| `E0095` | `main` has a String[] or List[String] parameter, `…`, that is not in a supported position |
 | `E0096` | abstract method … cannot be private |
 | `E0097` | instance … is already defined (at most one instance is allowed per (trait, type)) |
 | `E0098` | enum … mixes shared parameters with `case` cases |

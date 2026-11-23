@@ -64,8 +64,11 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
   ): Option[Array[Term]] = {
     if (params == null || params.isEmpty) return None
     // Only worth trying when some argument is re-typeable to a more precise type.
+    // A branching argument too: `f(if b { some(1) } else { none() })` gives `none()`
+    // the parameter's type, and an `Option[String]` branch passed for an `Option[Int]`
+    // is an error at that branch, as for a typed `val` (#3255).
     val malleableIndices = args.zipWithIndex.collect {
-      case (expr, i) if i < params.length && isMalleable(expr) => i
+      case (expr, i) if i < params.length && (isMalleable(expr) || isBranching(expr)) => i
     }
     if (malleableIndices.isEmpty) return None
 
@@ -89,7 +92,21 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     val updated = params.clone()
     for (i <- malleableIndices if i < expectedArgTypes.length) {
       val expectedType = expectedArgTypes(i)
-      if (expectedType != null) {
+      if (expectedType != null && isBranching(args(i))) {
+        if (!TypeCheckingHelpers.containsTypeVariable(expectedType)) {
+          val errorsBefore = typing.suppressedErrorCount
+          val retyped = retypeArgument(args(i), context, expectedType)
+          val muted = typing.suppressedErrorCount != errorsBefore
+          retyped match {
+            case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
+              // A branch that does not fit the only candidate's parameter is the one error:
+              // report it there, and pass the call, so no E0005 names the join.
+              updated(i) = if (muted) calls.typed(args(i), context, expectedType).getOrElse(term) else term
+              changed = true
+            case _ =>
+          }
+        }
+      } else if (expectedType != null) {
         retypeArgument(args(i), context, expectedType) match {
           case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
             updated(i) = term
@@ -189,12 +206,13 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     if (expected == null || params == null || method.typeParameters.isEmpty || method.isVararg) return params
     if (params.length != method.argumentCount || args.length != params.length) return params
     // `Option[Int]?` pins `U` as `Option[Int]`, which then fits the nullable target.
+    val nullableTarget = expected.isInstanceOf[NullableType]
     val target = expected match {
       case n: NullableType => n.innerType
       case t => t
     }
     if (target.isBasicType) return params
-    val weak = args.indices.filter(i => params(i) != null && isTargetTypedClosure(args(i)))
+    val weak = args.indices.filter(i => params(i) != null && isTargetTypedClosure(args(i), nullableTarget))
     if (weak.isEmpty) return params
     val withoutWeak = params.clone()
     weak.foreach(withoutWeak(_) = null)
@@ -215,11 +233,55 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
               TypeRules.isAssignable(formal, term.`type`) =>
             if (updated == null) updated = params.clone()
             updated(i) = term
+          case _ if typing.suppressedErrorCount != errorsBefore && originalFitsSilently(callNode, method, params, classSubst, target) =>
+            // The original lambda's results joined to a raw type (`Option[String]` and
+            // `Option[Int]` -> `Option`) that fits the target, so it reports nothing and the
+            // muted error is the only one there is: report it, at the `return` (#3117).
+            calls.typed(args(i), context, formal)
+          case _ if typing.suppressedErrorCount != errorsBefore && resultIsWildcardJoin(params(i).`type`) =>
+            // The results joined to `Option[?]` (#3255), which the target rejects at the
+            // call. The muted error is the precise one: report it at the branch, and pass
+            // the call the re-typed lambda, so the call adds no second error.
+            calls.typed(args(i), context, formal).foreach { term =>
+              if (updated == null) updated = params.clone()
+              updated(i) = term
+            }
           case _ =>
         }
       }
     }
     if (updated == null) params else updated
+  }
+
+  /** Whether the call, with its arguments as first typed, yields a result the target accepts. */
+  private def originalFitsSilently(
+    callNode: AST.Node,
+    method: Method,
+    params: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    target: Type
+  ): Boolean = {
+    val errorsBefore = typing.suppressedErrorCount
+    val subst = typing.withSuppressedReporting {
+      GenericMethodTypeArguments.inferWithoutDefaults(typing, callNode, method, params, classSubst, target)
+    }
+    if (typing.suppressedErrorCount != errorsBefore) return false
+    val result = TypeSubstitution.substituteType(method.returnType, classSubst, subst, defaultToBound = true)
+    result != null && TypeRules.isAssignable(target, result)
+  }
+
+  /** A function type whose result is a join of different type arguments, such as `() -> Option[?]`. */
+  private def resultIsWildcardJoin(t: Type): Boolean = t match {
+    case fn: AppliedClassType if fn.typeArguments.nonEmpty =>
+      fn.typeArguments.last match {
+        case ap: AppliedClassType =>
+          ap.typeArguments.nonEmpty && ap.typeArguments.forall {
+            case w: WildcardType => w.lowerBound.isEmpty
+            case _ => false
+          }
+        case _ => false
+      }
+    case _ => false
   }
 
   private def mentionsAny(t: Type, names: Set[String]): Boolean = t match {
@@ -233,20 +295,38 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
 
   /**
    * A lambda that declares its parameter types (or has none) and no result type,
-   * whose result is malleable (a generic call or a collection literal).
+   * whose result is malleable (a generic call or a collection literal), or that has
+   * an explicit `return`: its results join to a raw type (`Option[String]` and
+   * `Option[Int]` -> `Option`) that fits the target whatever the last expression is,
+   * so only the re-type checks each `return` against the target (#3234). The same
+   * holds for a last expression that branches (#3243). Not for a
+   * nullable target: the re-type drops its `?`, so a valid `return null` would warn W0012.
    */
-  private def isTargetTypedClosure(expr: AST.Expression): Boolean = {
+  private def isTargetTypedClosure(expr: AST.Expression, nullableTarget: Boolean): Boolean = {
     val closure = expr match {
       case c: AST.ClosureExpression => c
       case AST.BlockExpression(_, List(c: AST.ClosureExpression), _) => c
       case _ => return false
     }
     closure.returns == null && closure.args.forall(_.typeRef != null) &&
-      closure.body != null && closure.body.elements.nonEmpty && (closure.body.elements.last match {
+      closure.body != null && closure.body.elements.nonEmpty && ((closure.body.elements.last match {
         case AST.ReturnExpression(_, result) => result != null && isMalleable(result)
         case e: AST.Expression => isMalleable(e)
         case _ => false
-      })
+      }) || (!nullableTarget && (ReturnNodeDetector.containsReturn(closure.body) ||
+        isBranching(closure.body.elements.last))))
+  }
+
+  /**
+   * An `if`/`else`, `select` or `try` whose branches may join to a raw type (#3243):
+   * `if b { other } else { tail }` with `Option[String]` and `Option[Int]` branches
+   * joins to `Option`, which fits the target, so only the re-type checks each branch.
+   */
+  private def isBranching(e: AST.Node): Boolean = e match {
+    case AST.IfExpression(_, _, _, elseBlock) => elseBlock != null
+    case _: AST.SelectExpression => true
+    case _: AST.TryExpression => true
+    case _ => false
   }
 
   /** A single method (by name) whose arity accepts `argCount` arguments, else None. */

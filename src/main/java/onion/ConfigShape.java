@@ -76,11 +76,13 @@ public final class ConfigShape<T> implements Shape<T> {
         final Map<String, Integer> entryLines;   // component name -> index into lines
         final List<Object> parsedValues;         // typed values as parsed, for unchanged-detection
         final boolean trailingNewline;
+        final boolean bom;                       // the text began with U+FEFF; render keeps it
 
         ConfigResidue(List<Line> lines, Map<String, Integer> entryLines,
-                      List<Object> parsedValues, boolean trailingNewline) {
+                      List<Object> parsedValues, boolean trailingNewline, boolean bom) {
             this.lines = lines; this.entryLines = entryLines;
             this.parsedValues = parsedValues; this.trailingNewline = trailingNewline;
+            this.bom = bom;
         }
     }
 
@@ -170,6 +172,10 @@ public final class ConfigShape<T> implements Shape<T> {
     @Override
     public Outcome<Lossless<T>> parseLossless(String text, Origin origin) {
         String source = origin == null ? "<input>" : origin.source();
+        // A leading byte order mark is an encoding marker, not part of the first key; the
+        // residue remembers it so render writes the file back as it was (#3035).
+        boolean bom = !text.isEmpty() && text.charAt(0) == '\uFEFF';
+        if (bom) text = text.substring(1);
         boolean trailingNewline = text.endsWith("\n");
         String body = trailingNewline ? text.substring(0, text.length() - 1) : text;
         List<Line> lines = scan(body);
@@ -204,7 +210,16 @@ public final class ConfigShape<T> implements Shape<T> {
             String baseTag = baseTag(tag);
             Integer at = keyToLine.get(name);
             if (at == null) {
-                if (!nullable) defects.add(Defect.at(origin, name, tag, "absent"));
+                if (!nullable) {
+                    String near = nearMiss(name, keyToLine.keySet());
+                    if (near == null) {
+                        defects.add(Defect.at(origin, name, tag, "absent"));
+                    } else {
+                        int nearLine = keyToLine.get(near) + 1;
+                        defects.add(Defect.at(Origin.atLine(source, nearLine), name, tag,
+                            "absent (did you mean \"" + near + "\" on line " + nearLine + "?)"));
+                    }
+                }
                 values.add(null);
                 continue;
             }
@@ -228,7 +243,41 @@ public final class ConfigShape<T> implements Shape<T> {
 
         T value = build.call(values);
         return Outcome.ok(new Lossless<>(value,
-            new ConfigResidue(lines, entryLines, values, trailingNewline), this));
+            new ConfigResidue(lines, entryLines, values, trailingNewline, bom), this));
+    }
+
+    /**
+     * An unknown key in the document that looks like a misspelling of {@code name}: equal
+     * ignoring case, or within edit distance 2. Keys that another component owns are never
+     * offered. Keys stay case-sensitive; this only feeds the defect text (#2996).
+     */
+    private String nearMiss(String name, java.util.Set<String> keys) {
+        String best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (String key : keys) {
+            if (names.contains(key)) continue;
+            int d = key.equalsIgnoreCase(name) ? 0 : editDistance(name, key);
+            if (d <= 2 && d < bestDistance) {
+                best = key;
+                bestDistance = d;
+            }
+        }
+        return best;
+    }
+
+    private static int editDistance(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] t = prev; prev = cur; cur = t;
+        }
+        return prev[b.length()];
     }
 
     @Override
@@ -307,7 +356,7 @@ public final class ConfigShape<T> implements Shape<T> {
             if (crlf && !insertions.isEmpty()) sb.append('\r');
             sb.append('\n');
         }
-        return sb.toString();
+        return r.bom ? "\uFEFF" + sb : sb.toString();
     }
 
     private boolean sameShape(ConfigShape<?> other) {

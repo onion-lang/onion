@@ -328,9 +328,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // Generate copy(components...): ThisType method
       if (!userDefinedMethodNames.contains("copy")) {
         val copyModifier = Modifier.PUBLIC | Modifier.SYNTHETIC_RECORD
+        // A generic record's copy returns the record at its own type arguments
+        // (`P[A, B]`, not the raw `P`), so `p.copy(y = 1).x()` on a `P[String, Int]`
+        // is a String (#3101).
         val copyMethod = new MethodDefinition(
           node.location, copyModifier, definition_, "copy",
-          argTypes, definition_, null
+          argTypes, definition_.selfType, null
         )
         definition_.add(copyMethod)
       }
@@ -989,7 +992,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     typeRef
   }
 
-  private def constructTypeHierarchy(node: ClassType, visit: MutableSet[ClassType]): Unit = {
+  private def constructTypeHierarchy(start: ClassType, visit: MutableSet[ClassType]): Unit = {
+    // `I[String]` and `I[List[String]]` are different applied types of one class. Walk the
+    // raw class, or `interface I[T] conforms I[List[T]]` never reaches a visited node.
+    val node = start match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
     if (node == null || visit.contains(node)) return
     visit += node
     node match {

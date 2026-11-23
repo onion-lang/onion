@@ -758,6 +758,12 @@ remaining argument after the required leading ones are consumed. A
 or in the middle — is a compile error: it must be either the only
 parameter (raw argv) or the last one (rest collector).
 
+The rest collector may also be written `List[String]`
+(`def main(cmd: String, files: List[String])`); it collects the same
+arguments as a list. Like `String[]`, it may be the only parameter
+(`def main(files: List[String])` receives every argument), and it must
+have no default. A misplaced or defaulted one is E0095.
+
 ## Warnings
 
 `--warn off|on|error` sets the level; `--Wno codes` suppresses specific

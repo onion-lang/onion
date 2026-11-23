@@ -96,10 +96,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     // and retypes the malleable ones against its resolved parameter types --
     // before giving up and re-running unsuppressed to report the real error.
     val hasMalleable = calls.hasMalleableArgs(node.args)
+    var eagerMutedErrors = false
     val params0 = {
+      val mutedBefore = calls.typing.suppressedErrorCount
       val eager =
         if (hasMalleable) calls.typing.withSuppressedReporting(calls.typedTerms(node.args.toArray, context))
         else calls.typedTerms(node.args.toArray, context)
+      eagerMutedErrors = hasMalleable && eager != null && calls.typing.suppressedErrorCount != mutedBefore
       if (eager != null || !hasMalleable) eager
       else {
         val topLevel = bodyContext.topLevelClass.filter(t => !(t eq targetType))
@@ -142,7 +145,16 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         }
       } else (params0, methods0)
 
-    if (methods.length == 0 && declaresCallee(node.name) && node.args.exists(_.isInstanceOf[AST.ClosureExpression])) {
+    // A method of the enclosing class comes before a same-named local, as on the
+    // untyped-lambda path: when the class declares the callee and a closure is passed,
+    // the bidirectional retry decides first (#3075's typed-lambda case).
+    val classRetry = methods.length == 0 && declaresCallee(node.name) &&
+      node.args.exists(_.isInstanceOf[AST.ClosureExpression])
+    val localResult = if (methods.length == 0 && !classRetry) localCallable(node, params, context, expected) else None
+
+    if (localResult.isDefined) {
+      localResult.get
+    } else if (classRetry) {
       // A closure with explicitly typed parameters types eagerly as FunctionN, which a
       // Java functional-interface parameter does not accept; retry bidirectionally so the
       // resolved parameter type decides (SAM conversion), as the static/instance paths do.
@@ -154,6 +166,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected, context) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)
+          if (eagerMutedErrors) staticImportCallee(term).foreach { m =>
+            if (!m.isVararg && m.arguments.length == node.args.length)
+              reportErrorsMutedInKeptArguments(node.args, m.arguments, context)
+          }
           Some(term)
         case MethodFallbackLookup.Error =>
           None
@@ -190,10 +206,75 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       if (!ensureInstanceAvailable(node, method, context)) return None
       val classSubst = selfClassSubstitution(method)
       calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
-        expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
+        expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs).map { finalParams =>
+          if (eagerMutedErrors) reportErrorsMutedInKeptArguments(node.args, expectedArgs, context)
+          finalParams
+        },
         finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
       )
     }
+  }
+
+  private def reportErrorsMutedInKeptArguments(
+    args: List[AST.Expression],
+    expectedArgs: Array[Type],
+    context: LocalContext
+  ): Unit =
+    ArgumentHelpers.reportErrorsMutedInKeptArguments(calls.typing, args, expectedArgs) { (arg, formal) =>
+      calls.typed(arg, context, formal)
+    }
+
+  /** A local that holds a function shadows a default-imported static of the same name (#3075). */
+  private def localCallable(
+    node: AST.UnqualifiedMethodCall,
+    params: Array[Term],
+    context: LocalContext,
+    expected: Type
+  ): Option[Option[Term]] =
+    if (context.lookup(node.name) == null) None
+    else callableValueCallSupport.resolveCallableValue(node, params, context, expected) match {
+      case MethodFallbackLookup.Found(term) => Some(Some(term))
+      case MethodFallbackLookup.Error => Some(None)
+      case MethodFallbackLookup.NotFound => None
+    }
+
+  /**
+   * [[localCallable]] for a call with untyped lambda arguments: the lambdas are typed
+   * against the local's `call` parameters, as `local.call(...)` would type them.
+   * `None` when no local of that name holds a callable value.
+   */
+  private def localCallableWithClosures(
+    node: AST.UnqualifiedMethodCall,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Option[Term]] =
+    if (node.typeArgs.nonEmpty) None
+    else {
+      val local = context.lookup(node.name)
+      if (local == null) None
+      else local.tp match {
+        case targetType: ObjectType if targetType.methods("call").nonEmpty =>
+          context.recordUsage(node.name)
+          Some(fallback.typeCallWithBidirectionalInferenceCore(
+            node, "call", node.args, Nil, new RefLocal(local), targetType, context, expected, untypedClosureIndices
+          ))
+        case nullable: NullableType if (nullable.innerType match {
+              case o: ObjectType => o.methods("call").nonEmpty
+              case _ => false
+            }) =>
+          context.recordUsage(node.name)
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName)
+          Some(None)
+        case _ => None
+      }
+    }
+
+  /** The method a statically imported call (`println(..)`) resolved to, under any cast. */
+  private def staticImportCallee(term: Term): Option[Method] = term match {
+    case c: CallStatic => Some(c.method)
+    case c: AsInstanceOf => staticImportCallee(c.target)
+    case _ => None
   }
 
   private def declaresCallee(name: String): Boolean = {
@@ -255,6 +336,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           node, name, node.args, node.typeArgs, top, context, expected, untypedClosureIndices
         )
       case _ =>
+        // A local holding a function value shadows a default-imported static of the same
+        // name here too (#3075): type the call as `local.call(...)`, so the lambda takes
+        // the local's parameter type, before any import is considered.
+        localCallableWithClosures(node, context, expected, untypedClosureIndices) match {
+          case Some(result) => return result
+          case None =>
+        }
         // A static-imported function types its lambda as `Type::name(...)` does, when exactly
         // one imported type has an overload that fits the other arguments (#2667).
         staticImportMethodCallSupport.soleImportedTypeFor(node, context, expected, untypedClosureIndices) match {
@@ -274,6 +362,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         // callable value or static import is genuinely absent).
         val params0 = calls.typedTerms(node.args.toArray, context)
         if (params0 == null) return None
+        localCallable(node, params0, context, expected) match {
+          case Some(result) => return result
+          case None =>
+        }
         staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected, context) match {
           case MethodFallbackLookup.Found(term) =>
             checkRegexLiteral(node, term)

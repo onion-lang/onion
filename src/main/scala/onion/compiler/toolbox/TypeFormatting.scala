@@ -43,7 +43,7 @@ object TypeFormatting {
   def methodReference(owner: TypedAST.ClassType, name: String, isStatic: Boolean = true): String = {
     val written = sourceMethodName(name)
     if (owner == null || isTopLevelContainer(owner)) written
-    else if (extensionReceiver(owner.name).isDefined) s"${extensionReceiver(owner.name).get}.$written"
+    else if (extensionReceiver(owner).isDefined) s"${extensionReceiver(owner).get}.$written"
     else if (isStatic) s"${owner.name}::$written"
     else s"${owner.name}.$written"
   }
@@ -53,7 +53,12 @@ object TypeFormatting {
    * for. A call to an extension method reads `"a".shout()`, so a diagnostic names it
    * `String.shout`; the container is a class the user never wrote (#2846).
    */
-  private def extensionReceiver(className: String): Option[String] = {
+  private def extensionReceiver(owner: TypedAST.ClassType): Option[String] = owner match {
+    case cd: ClassDefinition if cd.extensionReceiverName.isDefined => cd.extensionReceiverName
+    case _ => extensionReceiverFromName(owner.name)
+  }
+
+  private def extensionReceiverFromName(className: String): Option[String] = {
     val simple = className.substring(className.lastIndexOf('.') + 1)
     if (simple.startsWith("Extension$") && simple.length > "Extension$".length)
       Some(simple.substring("Extension$".length).replace('_', '.'))

@@ -1,0 +1,127 @@
+package onion.compiler.tools
+
+import onion.tools.Shell
+
+/** `copy(..)` treats named arguments as an ordinary call does (#3100). */
+class RecordCopyNamedArgumentSpec extends AbstractShellSpec {
+  describe("record copy with named arguments") {
+    it("rejects a name given twice (E0044), so no argument is dropped unrun") {
+      val result = shell.run(
+        """
+          |record R(a: String, b: String)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r = new R("x", "y").copy(a = "1", a = "2")
+          |    return r.a()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Failure(-1))
+    }
+
+    it("binds a named argument to the record's own copy by parameter name") {
+      val result = shell.run(
+        """
+          |record Q(a: String, b: String) {
+          |public:
+          |  def copy(b: String, a: String): Q = new Q(a, b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new Q("x", "y").copy(a = "A", b = "B").toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("Q(a=A, b=B)"))
+    }
+
+    it("still partially copies with the generated copy") {
+      val result = shell.run(
+        """
+          |record R(a: String, b: String)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new R("x", "y").copy(b = "B").toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("R(a=x, b=B)"))
+    }
+
+    it("binds by name when only one of two own copy overloads is reordered") {
+      val result = shell.run(
+        """
+          |record Q(a: String, b: String) {
+          |public:
+          |  def copy(b: String, a: String): Q = new Q(a, b)
+          |  def copy(a: String, b: Int): Q = new Q(a, "" + b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new Q("x", "y").copy(a = "A", b = "B").toString() + " " + new Q("x", "y").copy(a = "A", b = 7).toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("Q(a=A, b=B) Q(a=A, b=7)"))
+    }
+
+    it("still partially copies through an own copy that takes the components in order") {
+      val result = shell.run(
+        """
+          |record P(a: String, b: String) {
+          |public:
+          |  def copy(a: String, b: String): P = new P(a + "!", b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new P("x", "y").copy(b = "B").toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("P(a=x!, b=B)"))
+    }
+
+    it("keeps the partial copy when another own copy overload has a different arity") {
+      val seconds = List("def copy(a: String): P = new P(a + \"?\", \"-\")", "def copy(): P = this", "def copy(n: Int): P = this")
+      seconds.foreach { second =>
+        val result = shell.run(
+          s"""
+            |record P(a: String, b: String) {
+            |public:
+            |  def copy(a: String, b: String): P = new P(a + "!", b)
+            |  $second
+            |}
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    return new P("x", "y").copy(b = "B").toString()
+            |  }
+            |}
+            |""".stripMargin, "None", Array())
+        assert(result == Shell.Success("P(a=x!, b=B)"), second)
+      }
+    }
+
+    it("partially copies through an own copy whose parameter names are not component names") {
+      val result = shell.run(
+        """
+          |record P(x: Int, y: Int) {
+          |public:
+          |  def copy(nx: Int, ny: Int): P = new P(nx, ny)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new P(1, 2).copy(y = 5).toString() + " " + new P(1, 2).copy(nx = 7, ny = 8).toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("P(x=1, y=5) P(x=7, y=8)"))
+    }
+  }
+}

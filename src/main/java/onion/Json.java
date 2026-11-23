@@ -823,9 +823,19 @@ public final class Json {
 
         public String asString() { return raw == null ? null : String.valueOf(raw); }
 
-        public int asInt() { return raw instanceof Number n ? n.intValue() : 0; }
+        /** The number as an Int; 0 when absent, not a number, a fraction, or outside Int range (as {@link #getInt}, never a wrapped value). */
+        public int asInt() {
+            if (!(raw instanceof Number n)) return 0;
+            Long v = Scalars.integral(n, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            return v == null ? 0 : v.intValue();
+        }
 
-        public long asLong() { return raw instanceof Number n ? n.longValue() : 0L; }
+        /** The number as a Long; 0 when absent, not a number, a fraction, or outside Long range. */
+        public long asLong() {
+            if (!(raw instanceof Number n)) return 0L;
+            Long v = Scalars.integral(n, Long.MIN_VALUE, Long.MAX_VALUE);
+            return v == null ? 0L : v;
+        }
 
         public double asDouble() { return raw instanceof Number n ? n.doubleValue() : 0.0; }
 

@@ -481,8 +481,14 @@ private[compiler] final class MethodBodySupport(
         case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
         case _ => false
       })
+    // A slot the parent's type arguments made concrete (`extends C[Integer](..)` turns
+    // `List[T]` into `List[Integer]`) gets the check `new C[Integer](..)` gives it; the
+    // erased match alone let a `List[Double]` in (#3016).
+    def concreteSlotFits: Boolean =
+      TypeCheckingHelpers.containsTypeVariable(formal) || param == null || param.`type` == null ||
+        TypeRelations.isConstructorArgAssignable(formal, param.`type`, bodyContext.table)
     formal == null || javaWildcardSlot ||
-      (!primitiveIntoVar && AssignabilitySupport.typeVariableSlotFits(formal, param, bodyContext.table))
+      (!primitiveIntoVar && concreteSlotFits && AssignabilitySupport.typeVariableSlotFits(formal, param, bodyContext.table))
   }
 
   /** Checks the constructor that `extends C[T](..)` resolved against its type-variable slots.
@@ -513,16 +519,10 @@ private[compiler] final class MethodBodySupport(
                 if term.`type` != null then retyped(i) = term
               }
           }
-          // A lambda is judged as `new C[T](..)` judges one (ConstructionTyping's closure
-          // path): by assignability to the slot it was typed against. Both paths still let
-          // `() -> 5` into a `() -> T` slot; that is one bug in both places (#3018).
-          def isLambda(e: AST.Expression): Boolean = e match {
-            case _: AST.ClosureExpression => true
-            case b: AST.BlockExpression => b.elements.nonEmpty && b.elements.last.isInstanceOf[AST.ClosureExpression]
-            case _ => false
-          }
+          // A lambda is judged by the assignment rule too, except one whose result is free
+          // (it never returns, or its only value is `null`) and takes the slot's type (#3003, #3018).
           val fits = misfits.forall { i =>
-            (isLambda(args(i)) || superSlotFits(formals(i), retyped(i))) &&
+            (superSlotFits(formals(i), retyped(i)) || AssignabilitySupport.lambdaResultIsFree(retyped(i))) &&
               TypeRelations.isConstructorArgAssignable(formals(i), retyped(i).`type`, bodyContext.table)
           }
           if fits then (Array(ctor), Boxing.adaptArguments(bodyContext.table, retyped, formals))

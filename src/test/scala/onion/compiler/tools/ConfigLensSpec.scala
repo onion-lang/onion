@@ -104,6 +104,69 @@ class ConfigLensSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, r.toString)
     }
 
+    it("keeps a leading BOM through an edit and an unedited render (#3035)") {
+      val r = shell.run(decl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val dir = java.nio.file.Files::createTempDirectory("lens-spec").toString()
+          |    val p = dir + "/bom.conf"
+          |    val bom = "\uFEFF"
+          |    java.nio.file.Files::write(java.nio.file.Paths::get(p), (bom + "host = a\nport = 1\ndebug = false\n").getBytes("UTF-8"))
+          |    val lens = file(p).readLossless(Server::cfg()).get()
+          |    if lens.value().host() != "a" { return 1 }
+          |    if lens.render() != bom + "host = a\nport = 1\ndebug = false\n" { return 2 }
+          |    val out = lens.edit { v -> v.copy(port = 2) }.render()
+          |    if out != bom + "host = a\nport = 2\ndebug = false\n" { return 3 }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(0) == r, r.toString)
+    }
+
+    it("hands a user-written lossless shape the text without the file's BOM, as read does, and render puts it back (#3213)") {
+      val r = shell.run(
+        """record P(name: String)
+          |class NoRes conforms Residue { public: def this {} }
+          |class NameShape conforms Shape[P] {
+          |public:
+          |  def this {}
+          |  def parse(text: String, origin: Origin): Outcome[P] = Outcome::ok(new P(text))
+          |  def canPrint(): Boolean = true
+          |  def print(v: P): String = v.name()
+          |  def describe(): String = "name"
+          |  def isLossless(): Boolean = true
+          |  def parseLossless(text: String, origin: Origin): Outcome[Lossless[P]] = Outcome::ok(new Lossless[P](new P(text), new NoRes(), this))
+          |  def printLossless(v: P, r: Residue): String = v.name()
+          |}
+          |def l1(): Boolean
+          |  ensures result
+          |{
+          |  val s = new NameShape()
+          |  return s.parse(s.print(new P("x"))).get() == new P("x")
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val dir = java.nio.file.Files::createTempDirectory("lens-spec").toString()
+          |    val p = dir + "/name.txt"
+          |    java.nio.file.Files::write(java.nio.file.Paths::get(p), ("\uFEFF" + "alice").getBytes("UTF-8"))
+          |    val r = file(p).readLossless(new NameShape()).get()
+          |    val a = r.value().name()
+          |    val b = file(p).read(new NameShape()).get().name()
+          |    val raw = new String(java.nio.file.Files::readAllBytes(java.nio.file.Paths::get(p)), "UTF-8")
+          |    if a != "alice" { return 1 }
+          |    if a != b { return 2 }
+          |    if r.render() != raw { return 3 }
+          |    if r.edit { v -> new P("bob") }.render() != "\uFEFF" + "bob" { return 4 }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(0) == r, r.toString)
+    }
+
     it("reports an unreadable file as a defect, not an exception") {
       val r = shell.run(decl +
         """class Test {

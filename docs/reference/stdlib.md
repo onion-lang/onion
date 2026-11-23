@@ -565,12 +565,16 @@ value spellings). `printLossless(value, residue)` renders back through that resi
 unchanged parts reproduce byte for byte, and only deliberately changed values re-render.
 `Residue` is opaque; hand it back only to the shape that produced it.
 
+`file(p).readLossless(shape)` gives the shape the text without a leading byte order mark
+(BOM), as `read(shape)` does. `render()` puts the mark back, so the round trip stays byte
+for byte for every lossless shape, yours included.
+
 `Lossless[T]` is the lens itself: `value()`/`residue()` read the pair, `withValue(v)`
 swaps the value while keeping the residue, and `edit { v -> ... }` focuses an update.
 `render()` reassembles the text:
 
 ```onion
-val r   = configShape.parseLossless(file"app.conf".text()).get()
+val r   = file"app.conf".readLossless(configShape).get()
 val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  one changed line
 ```
@@ -1009,19 +1013,22 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  (onion.Colls::reduce,
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
-**`fold`/`reduce`/`foldl` warn on their own most idiomatic use**: `Colls::fold`
-and `Colls::reduce`'s 3-arg form (likewise `Iterables::foldl`) are Java
-generic methods (`<T, R> R fold(List<T>, R, Function2<R, T, R>)`); their
-*declared* return type is the type variable `R` itself -- a boxed reference
-with no Onion-tracked nullability -- regardless of what the call site's own
-arguments pin `R` to. So `xs.fold(0) { a, b -> a + b }` / `xs.reduce(0, (acc,
-x) -> acc + x)` on a `List[Int]`, with a literal zero and an `Int`-returning
-combiner, still unboxes the result through `[W0015]` when assigned to a
-non-null `Int` -- the same warning `Json::getInt` on a possibly-missing key
-gets, even though nothing here can actually be null. There is no
-Onion-native, warning-free alternative for a non-`Double` running total
-(`Stats::sum`/`sumBy` return `Double`); suppress the warning with `--Wno
-platform-unboxing` if the call is intentional.
+**`fold`/`reduce`/`foldl` start from your value, so a primitive fold is not null**:
+`Colls::fold` and `Colls::reduce`'s 3-arg form (likewise `Iterables::foldl`) are
+Java generic methods (`<T, R> R fold(List<T>, R, Function2<R, T, R>)`), so their
+declared return type is the type variable `R`. When the initial value is a
+non-null primitive and the lambda only returns primitives, the result is
+non-null too, and assigning it to an `Int` gives no `[W0015]`:
+
+```onion
+val total: Int = xs.fold(0) { a, b -> a + b }        // no warning
+val t: Int = keys.fold(0) { a, k -> m.get(k) }      // [W0015]: Map.get can return null
+```
+
+A lambda that returns `null` still gets `[W0012]`, and a nullable initial value
+(`Int?`) is `E0070`, as before. `[W0015]` stays for a lambda that returns a Java
+value such as `m.get(k)`, for a function value that is not a lambda, and for
+other generic statics such as `Colls::getOrDefault`.
 
 **`first`/`last` are shadowed too, but harmlessly**: `onion.Colls` also
 declares `first(List)`/`last(List)` extensions with the same erased
@@ -1703,6 +1710,7 @@ Json::getStringOr(obj, "name", "anon") // "anon"
 A missing key or out-of-range index on the `Json::value` wrapper yields a null-holding
 `Value` instead of throwing, so a chain like `v["users"][99]["name"]` stays safe until you
 convert it — `asString()`/`asInt()`/etc. return `null`/`0`/`false` at the end of the chain.
+`asInt()`/`asLong()` also give `0` for a fraction (`3.7`) or a number outside the type's range, never a truncated or wrapped one.
 `Value` also has `isNull()` (was the underlying value `null`?), `size()` (element count for
 an array/object Value, `0` otherwise), and `raw()` (the underlying `Map`/`List`/scalar/`null`).
 

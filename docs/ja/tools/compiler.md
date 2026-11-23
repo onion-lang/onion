@@ -144,7 +144,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0013` | `suspicious-interpolation` | 疑わしい文字列補間構文 |
 | `W0014` | `discarded-toplevel` | main が定義されているためトップレベル文が無視された |
 | `W0015` | `platform-unboxing` | ボックス化されたプラットフォーム値が非 null プリミティブへ暗黙的にアンボックスされた |
-| `W0016` | `ineffective-tail-recursive` | `@TailRecursive` が付与されているが、その相互再帰グループを最適化できなかった |
+| `W0016` | `ineffective-tail-recursive` | `@TailRecursive` が付与されているが、そのメソッドまたは相互再帰グループを最適化できなかった |
 | `W0017` | `malformed-effect-table` | ライブラリ jar の効果表が壊れていて無視された |
 | `W0018` | `foreign-effect-entry` | ライブラリ jar の効果表が jar の外のクラスを名指しており、それらのエントリは無視された |
 | `W0019` | `discarded-builder-result` | イミュータブルなビルダーのメソッドの結果が捨てられており、呼び出しが何も行わない |
@@ -156,6 +156,8 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0025` | `override-breaks-contract` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた |
 | `W0026` | `contract-not-enforced` | `--contracts runtime` が実行時に守らない契約の節がある |
 | `W0028` | `ensures-not-proved` | メソッドが `ensures` を破りうる。ソルバーが反例を見つけた |
+| `W0029` | `unmarked-nullable-override` | `override` のないメソッドが、`?` だけ違う継承メソッドをオーバーライドしている |
+| `W0030` | `unmarked-nullable-overload` | `override` のないメソッドが、`?` だけ違う継承メソッドのオーバーライドに見えるが、オーバーロードになっている |
 | `W0027` | `contract-trusted` | `@Trusted` により、検証されない契約を前提にしている |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`

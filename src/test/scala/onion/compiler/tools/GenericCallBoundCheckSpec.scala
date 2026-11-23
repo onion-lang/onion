@@ -246,4 +246,49 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
       assert(Shell.Success(4) == r)
     }
   }
+  describe("a method returning T whose call breaks `T extends B` (#2977)") {
+    it("is rejected, though the call has no expected type") {
+      val r = shell.run(
+        """import { java.util.* }
+          |def mk[B, T extends B](xs: List[B], t: T): T { xs.add(t); return t }
+          |def main(args: String[]): Int {
+          |  val xs: List[String] = new ArrayList[String]()
+          |  IO::println(mk(xs, Integer::valueOf(1)))
+          |  return 0
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("is rejected for a static method and for explicit type arguments") {
+      val viaStatic = errorCodes(
+        """import { java.util.* }
+          |class H { public: static def mk[B, T extends B](xs: List[B], t: T): T { xs.add(t); return t } }
+          |def main(args: String[]): void {
+          |  val xs: List[String] = new ArrayList[String]()
+          |  val a = H::mk(xs, Integer::valueOf(1))
+          |}
+          |""".stripMargin)
+      assert(viaStatic.nonEmpty)
+      val explicit = errorCodes(
+        """import { java.util.* }
+          |def mk[B, T extends B](xs: List[B], t: T): T { xs.add(t); return t }
+          |def main(args: String[]): void {
+          |  val xs: List[String] = new ArrayList[String]()
+          |  val b = mk[String, Integer](xs, Integer::valueOf(1))
+          |}
+          |""".stripMargin)
+      assert(explicit.nonEmpty)
+    }
+    it("still compiles when T does extend B") {
+      val r = shell.run(
+        """import { java.util.* }
+          |def mk[B, T extends B](xs: List[B], t: T): T { xs.add(t); return t }
+          |def main(args: String[]): Int {
+          |  val xs: List[CharSequence] = new ArrayList[CharSequence]()
+          |  return mk(xs, "abc").length()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(3) == r)
+    }
+  }
 }

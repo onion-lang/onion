@@ -143,7 +143,7 @@ public:
 - **`this` is a `Mid[U]`:** inside `class Mid[U]`, `this` keeps `U`, also through
   `val me = this`, `id(this)`, `[this]` or `() -> this`. So `same(this)` fits an inherited
   `same(o: Box[T])`, and `me.get()` is a `U` (it was raw `Mid`, so `me.get()` was an `Object`).
-- **Branches with different type arguments:** `if b { [t] } else { [u] }` is a raw `List`.
+- **Branches with different type arguments:** `if b { [t] } else { [u] }` is a `List[?]` (#3255).
   It compiles where an `Object` is expected; where a `List[T]` is expected, the `[u]` branch is
   `E0000`.
 - **No `onion migrate` rule, on purpose:** the only mechanical rewrite is inserting
@@ -676,6 +676,90 @@ def greet(): String = "Hi, #{this.name}"
   and inside `#{...}` in strings. It leaves comments, plain string text, `\#{self}` and
   `` `self` `` alone.
 
+## `override` must match the base method's types up to `?`
+
+An `override` whose parameter is `JInteger` where the base has `Int`, or whose return is
+`Int?` where the base returns `Int`, never overrode anything. It compiled as a new overload,
+and a call through the base type still ran the base method. Now it is **E0068** (#2896).
+
+```onion
+class Base {
+public:
+  def this {}
+  def dec(k: Int): void { println("Base") }
+}
+class Up extends Base {
+public:
+  def this {}
+  override def dec(k: JInteger): void { println("Up") }   // Before: compiled. Now: E0068
+}
+val b: Base = new Up(); b.dec(1)                           // Before: printed Base
+```
+
+- **What you see:** **E0068** `method dec(JInteger) is marked override but does not override
+  any method ...`, followed by the base signature (`dec(Int): void`).
+- **Still fine:** `override def dec(k: Int?)` over `dec(k: Int)`, where the parameter differs
+  only by `?`, now really overrides. A boxed parameter through a generic supertype
+  (`G[JInteger]`) overrides too.
+- **To update:** to override, write the base types (`dec(k: Int)`, or `dec(k: Int?)`). To keep
+  a separate overload, remove `override` and give it parameter types that differ by more
+  than `?`, or another name.
+- **No `onion migrate` rule:** whether the method was meant to override or to overload is
+  your choice, and the two edits run different code. The error shows the base signature
+  instead.
+
+A method whose parameters differ from a base method's **only by `?`** is the same method
+now, with or without `override`:
+
+- **Before:** an unmarked `def dec(k: Int?): void` beside a base `dec(k: Int): void` was a
+  separate overload, and `b.dec(1)` through `Base` ran the base. With a reference return
+  (`String`), the same method already overrode. `override` changed nothing for a reference
+  return but decided the outcome for `void` and primitive returns.
+- **Now:** it overrides for every return type. `override` is a check, as for exact types,
+  and never decides which method runs. Without `override`, the compiler warns **W0029**
+  (`'dec(Int?)' overrides 'dec(Int): void' of Base ...`). Over a `final` base method this is
+  **E0039**, as for the exact types (`setDaemon(on: Boolean?)` in a `Thread` subclass included).
+- **The other direction is never an override (#3053):** an own `f(k: Int)` beside a base
+  `f(k: Int?)` is an overload for every return type, so `null` through `Base` reaches the
+  base method. Before, with a reference return (`String`) it overrode through a bridge that
+  unboxed, and `null` through `Base` threw. Marked `override`, it is **E0068**; make the
+  parameter `Int?` to override, or remove `override` to keep the overload.
+- **Unmarked, it now warns W0030**, since `b.f(1)` through `Base` silently changed from the
+  own method to the base one (`Up` → `Base`):
+  `'f(Int)' does not override 'f(Int?): String' of Base ...`. Make the parameter `Int?` to
+  override, or rename the method to keep the overload.
+- **Known exception:** a chain `A.f(Int)`, `B.f(Int?)` (`override`), `C.f(Int): String`
+  (`override`) still bridges, so `null` through `B` can still throw there.
+- **To silence W0029:** add `override` if the method is meant to replace the base one.
+- **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
+  migrate` rule: only you know whether the method was meant to replace the base one.
+
+## A primitive parameter does not implement a boxed abstract method
+
+A class method with `Int` where a non-generic interface or abstract class has `JInteger` (or
+the reverse) was accepted as the implementation. No bridge joined the two, so a call through
+the supertype threw `AbstractMethodError`. Now the class is **E0037** (#2922).
+
+```onion
+interface I { def n(x: JInteger): String }
+class C conforms I {            // Before: compiled. Now: E0037
+public:
+  def this {}
+  def n(x: Int): String = "int " + x
+}
+val i: I = new C; println(i.n(4))   // Before: AbstractMethodError
+```
+
+- **What you see:** **E0037** `class C must implement abstract method n(java.lang.Integer) ...`,
+  then `n(Int) does not implement it ... Declare n(JInteger) to implement it.`
+- **Still fine:** a generic supertype (`G[JInteger]` with `n(x: T)`), where `n(x: Int)` is
+  bridged, and a parameter that differs only by `?` (`n(x: Int?)` for `n(x: Int)`).
+- **To update:** write the supertype's parameter type (`def n(x: JInteger)`). Keep the
+  `Int` method beside it if other code calls it.
+- **No `onion migrate` rule:** a program that hits this never ran the call through the
+  supertype, and only you know which of the two methods it should run. The hint shows the
+  spelling instead.
+
 ## `OnionMath::randomInt` is removed; use `Rand::nextInt`
 
 Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).
@@ -751,3 +835,174 @@ IO::println(g("a" as CharSequence))    // charseq, before and now
   interface, and a call to only one of the overloads.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
   only you know which overload a call meant. The hint shows the cast instead.
+
+## A list literal with a `null` element is a list of nullable (#2998)
+
+`[x, null]` with no expected type used to be a list of the non-null type. It is now a list of
+the nullable type, so the `null` is visible to the checker.
+
+```onion
+val ys = ["a", null]
+IO::println(ys[0].length())     // Before: 1. Now: E0070
+IO::println(ys[0]?.length())    // 1, before and now
+```
+
+| Program | Before | Now | To fix it |
+|---|---|---|---|
+| `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` or `ys[0]!!.length()` |
+| `total([1, null])` with `total(xs: List[Int])` | compiled, crashed on the `null` | E0005 | take `List[Int?]`, then handle each `null` |
+| `val n: Int = xs[1]` with `xs = [1, null]` | compiled, crashed on the `null` | E0070 | `xs[1] ?: 0` |
+| `String::join(",", ["a", null, "c"])` | `a,null,c` | E0005 | `String::join(",", ["a", null, "c"].map { s -> s ?: "null" })` |
+| `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | write the inner lists with one element type |
+| `["a", null] + ["b"]` | compiled | E0001 | give both lists the same type: `List[String?]` |
+| `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` with `xs = ["b", null, "a"]` | `[null, a, b]` | E0005 | name the element type once: `Comparator::naturalOrder[String?]()` |
+| `xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))` with the same `xs` | `[null, a, b]` | E0005 | a comparator over `String?`: `Comparator::nullsFirst[String?]((a, b) -> a!!.compareToIgnoreCase(b!!))` |
+
+- **What you see:** E0070 (`may be null and cannot be dereferenced directly`); E0000 when
+  the list is assigned to a `List[Int]` variable; or E0005 when it is passed to a `List[Int]`
+  parameter or to a Java generic method such as `xs.sort(comparator)`,
+  `Collections::sort(xs, comparator)` or `String::join`. The cause is the `null` in the literal.
+- **A Java comparator over the element type:** `nullsFirst` passes no `null` to the
+  comparator it wraps, but its signature cannot say so. Name `String?` as the type argument
+  once, as in the two `sort` rows above. The `!!` there never fails.
+- **A target type still works:** `val ys: List[Int?] = [1, null]`. `List[Int]` is rejected, as the `null` does not fit.
+- **Unchanged:** `[null]`, `[null, null]`, and a literal whose expected type is already known.
+- **Map literals too (#3201):** `["a": "x", "b": null]` with no expected type is a
+  `Map[String, String?]`. `t(["a": 1, "b": null])` with `t(m: Map[String, Int])` was
+  compiled and crashed at the read; it is now E0005. Take `Map[String, Int?]`, or drop the `null`.
+- **No `onion migrate` rule:** deciding what to do with a `null` (skip it, default it,
+  reject it) depends on the program. The edits above show each choice.
+
+## An array passed to `f(x)` / `f(xs...)` picks Java's method (#2955)
+
+When both `f(x)` and `f(xs...)` apply to an array, Onion used to drop the varargs one. Java
+treats the array as the varargs array itself, so it picks `f(xs...)`. Onion now does the same.
+
+```onion
+import { java.util.List as JList }
+val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+IO::println(JList::of(sa).size())             // Before: 1. Now: 3
+IO::println(JList::of[String[]](sa).size())   // 1, before and now
+```
+
+| Call | Before | Now | To keep the old result |
+|---|---|---|---|
+| `JList::of(sa).size()`, `JSet::of(sa).size()` | `1` | `3` | `JList::of[String[]](sa)` |
+| `Stream::of(sa).count()` | `1` | `3` | `Stream::of[String[]](sa)` |
+| `val n: List[String[]] = JList::of(sa)` | compiled | E0000 | `JList::of[String[]](sa)` |
+| `H::s(sa)` with `s(o: Object)` and `s(xs: Object...)` | `s(Object)` | `s(Object...)` | `H::s(sa as Object)` |
+| `h.a(ia)` with `ia: Int[]`, `a(o: Object)` and `a(xs: Object...)` | `a(Object...)` | `a(Object)` | pass an `Object[]` holding `ia`: `val w: Object[] = new Object[1]; w[0] = ia; h.a(w)` |
+
+- **What you see:** usually nothing; the program runs the other method. A variable declared
+  as `List[String[]]` gets E0000 (`type List[String[]] is expected, but type List[String] is used`).
+- **Why `Int[]` changes the other way:** an `Int[]` is not an `Object[]`, so it can only fill
+  `a(o: Object)`, as in Java.
+- **Unchanged:** a single non-array argument (`s("x")` takes `s(Object)`), several arguments
+  (`s("x", "y")` takes `s(Object...)`), and `s(null)`.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and only
+  you know whether you meant one element or the whole array. The table shows each edit.
+
+## A copy of a generic record keeps its type arguments (#3101)
+
+`copy(..)` on a generic record used to return the record with bare type variables, so a
+component read from the copy had type `A`. The copy now has the receiver's own type, as
+`this` already had.
+
+```onion
+record P[A, B](x: A, y: B)
+val q = new P[String, Int]("s", 1).copy(y = 2)
+val s: String = q.x()   // Before: E0000. Now: s
+```
+
+| Program | Before | Now | To keep the old result |
+|---|---|---|---|
+| `f(q.x())` with `f(o: Object)` and `f(s: String)` | `f(Object)` | `f(String)` | `f(q.x() as Object)` |
+| `val r: P[Object, Int] = p.copy(y = 3)` with `p: P[String, Int]` | compiled | E0000 | `new P[Object, Int](p.x(), 3)` |
+| `take(p.copy())` with `take(r: P[Object, Int])` | compiled | E0005 | `take(new P[Object, Int](p.x(), p.y()))` |
+
+- **What you see:** E0000 (`type P[Object, Int] is expected, but type P[String, Int] is
+  used`), E0005 for an argument, or, for an overloaded call, nothing: the other method runs.
+- **Why the assignment is rejected:** type arguments are invariant. `val r: P[Object, Int] = p`
+  without `copy` was already E0000; the copy now follows the same rule.
+- **Unchanged:** the bytecode, a non-generic record, and a user-defined `copy` method.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
+  only you know which method you meant. The table shows each edit.
+
+## Branches with other type arguments are checked against the target (#3241)
+
+Two branches of one generic class with different type arguments join as the raw class,
+and a raw value used to fit any target. Now, when the `if`, `select` or `try` has an
+applied target type, each branch is checked against it.
+
+```onion
+val other: Option[String] = Option::some("str")
+val tail: Option[Int] = Option::none()
+val c: Option[Int] = if b { other } else { tail }   // Before: compiled. Now: E0000 at `other`
+```
+
+| Program | Before | Now | To keep it compiling |
+|---|---|---|---|
+| `val c: Option[Int] = if b { other } else { tail }` | compiled; `c.get() + 1` threw `ClassCastException` | E0000 | give the branch the target's type, or use a wider target such as `Object` |
+| `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | compiled | E0000 | the same |
+| `val lo: List[Object] = ch2(() -> if b { objs } else { strs })` (a lambda for a generic `() -> U` parameter) | compiled and ran (`List` is invariant, so it was never sound) | E0000 at `strs` | widen the branch to `List[Object]`, or use a wider target |
+
+- **What you see:** E0000 (`type Option[Int] is expected, but type Option[String] is used`),
+  with the caret at the branch that does not fit.
+- **Unchanged:** branches that fit the target, a target such as `Object`, and a join with
+  no target (`val c = if b { other } else { tail }` is an `Option[?]`; see #3255 below).
+- **No `onion migrate` rule:** the program holds a value of the wrong type, and only you
+  know which branch is wrong. The error points at it.
+
+## A join of different type arguments is `Option[?]`, not a raw `Option` (#3255, #3247)
+
+Branches of one generic class with different type arguments joined as the raw class,
+and a raw value fits any `Option[Int]`. Now the join is `Option[?]`, which fits `Object`
+and nothing narrower. This closes the positions #3241 did not reach.
+
+```onion
+val x = if b { other } else { tail }   // Option[?]
+val c: Option[Int] = x                 // Before: compiled. Now: E0000
+```
+
+| Program | Before | Now | To keep it compiling |
+|---|---|---|---|
+| `f(if b { other } else { tail })` with `f(x: Option[Int])` | compiled; `ClassCastException` on read | E0000 at `other` | give both branches the parameter's type |
+| `chk { if b { other } else { tail } }` with `chk(f: () -> Option[Int])` | compiled | E0000 at `other` | the same |
+| `val x = if b { other } else { tail }; val c: Option[Int] = x` | compiled | E0000 | annotate `x`, or give both branches one type |
+
+- **What you see:** with a target, E0000 at the branch that does not fit, naming its type
+  (`Option[String]`). With no target, E0000 where the value is used, naming `Option[?]`. A call
+  to an overloaded function is E0005 naming `Option[?]`.
+- **Unchanged:** a target such as `Object`, calling a method on the join (`j.map { x -> .. }`
+  sees an `Object` element), and branches that fit.
+- **An empty branch takes the other type:** `f(if b { some(1) } else { none() })`,
+  `g(if b { [1, 2] } else { [] })` and `val x = if b { some(1) } else { none() }` still compile;
+  `none()`, `[]` and `[:]` take the parameter's type, or the other branch's.
+- **No `onion migrate` rule:** the value had the wrong type, and only you know which branch to fix.
+
+## A named call above its callee binds by name, as a call below it does (#3110)
+
+A call with named arguments can now reach a function or method declared later in the file.
+Before, a later overload had no parameter names yet, so it dropped out of named-argument
+resolution, or matched placeholder names. A named call above a set of overloads now picks
+the overload a call below them picks.
+
+```onion
+def a(): Int = f(x = 1)
+def f(x: Int): Int = 100
+def f(x: Long, y: Int = 2): Int = 200
+println(a())   // Before: 200. Now: 100, as when a() is declared below f
+```
+
+| Callee (declared below the call) | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `f(x: Int)`, `f(x: Long, y: Int = 2)` | `f(x = 1)` | `200` | `100` | `f(x = 1L)` |
+| `f(x: Int)`, `f(x: Int, y: Int = 2)` | `f(x = 1)` | `200` | E0006 | `f(x = 1, y = 2)` |
+| `b(x: Int, y: Int)` | `b(arg0 = 1, arg1 = 2)` | `12` | E0043 | `b(x = 1, y = 2)` |
+
+- **What you see:** a different overload runs with no message, **E0006**
+  `method call is applicable for both …`, or **E0043**
+  `unknown parameter name: arg0`.
+- **Still fine:** a named call below its callee, and a call with positional arguments only.
+- **No `onion migrate` rule:** the silent case is found only by resolving the call the old
+  way, and only you know which overload you meant. The table shows each edit.

@@ -17,6 +17,32 @@ private[compiler] object DuplicationChecks {
   private def erasedParamDescriptor(args: Array[Type]): String =
     args.map(Erasure.asmType).map(_.getDescriptor).mkString("(", "", ")")
 
+  // Parameter types up to `?`, compared by name as `BridgeMethodEmitter` does for a
+  // non-generic supertype.
+  private def plainNames(args: Array[Type]): Seq[String] =
+    args.toSeq.map {
+      case nt: NullableType => nt.unwrap.name
+      case other => other.name
+    }
+
+  // A parameter or return type as written in source, keeping `JInteger` apart from `Int`:
+  // E0068's hint must show the difference that made the override miss (#2896).
+  private val boxedAliases: Map[String, String] = Map(
+    "java.lang.Integer" -> "JInteger", "java.lang.Long" -> "JLong", "java.lang.Double" -> "JDouble",
+    "java.lang.Float" -> "JFloat", "java.lang.Boolean" -> "JBoolean", "java.lang.Byte" -> "JByte",
+    "java.lang.Short" -> "JShort", "java.lang.Character" -> "JCharacter")
+  private def sourceForm(tp: Type): String = tp match
+    case nt: NullableType => sourceForm(nt.innerType) + "?"
+    case ct: ClassType if !ct.isInstanceOf[AppliedClassType] && boxedAliases.contains(ct.name) => boxedAliases(ct.name)
+    case other => onion.compiler.toolbox.TypeFormatting.sourceForm(other)
+  private def signatureForm(name: String, args: Array[Type], ret: Type): String =
+    s"$name(${args.map(sourceForm).mkString(", ")}): ${sourceForm(ret)}"
+
+  // Mirrors `BridgeMethodEmitter.isBridgeableReturn`: the same JVM type, or a covariant reference.
+  private def bridgeableReturn(inherited: Type, own: Type): Boolean =
+    Erasure.asmType(inherited) == Erasure.asmType(own) ||
+      (!inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own))
+
   private def parameterPattern(args: Array[Type], typing: Typing): ErasedParameterPattern = {
     // Keep alternatives independent: materializing all complete signatures
     // would require 2^arity strings for primitive/boxed parameters.
@@ -175,7 +201,23 @@ private[compiler] object DuplicationChecks {
           // look the contract up under both keys.
           val specializedKey = erasedParamDescriptor(specializedArgs)
           val erasedKey = typing.table_.erasedParamsOf(contract)(erasedParamDescriptor(contract.arguments))
-          implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey)).foreach { impl =>
+          val exactImpl = implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey))
+          // A parameter differing only by `?` (`k: Int?` for `k: Int`) is the same slot, and
+          // codegen would bridge it: over a final method that is E0039, as for the exact
+          // types (#2896). The bridge itself is never emitted for a final target.
+          if exactImpl.isEmpty && Modifier.isFinal(contract.modifier) then
+            val specializedRet =
+              TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
+            implByName(contract.name).find(impl =>
+              impl.arguments.length == specializedArgs.length &&
+                questionOnly(plainNames(specializedArgs), specializedRet, specializedArgs, true, impl)
+            ).foreach { impl =>
+              val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location)
+                .orElse(memberLocations.get(impl.name)).getOrElse(fallback)
+              val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
+              typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
+            }
+          exactImpl.foreach { impl =>
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 
@@ -230,21 +272,21 @@ private[compiler] object DuplicationChecks {
    * base class or an implemented interface. If nothing is overridden, report
    * OVERRIDE_TARGET_NOT_FOUND.
    *
-   * Conservative by design: an implementation counts as overriding a base method
-   * when they share the same name and the same erased parameter descriptor
-   * (boxing-aware, matching the abstract-method-implementation check). Only when
-   * NO base method matches by name+arity+param-types is the override rejected.
+   * An implementation counts as overriding a base method when they share the same
+   * name and the same erased parameter descriptor, or when codegen bridges the two
+   * (`BridgeMethodEmitter`): through an applied generic supertype a primitive/boxed
+   * difference counts; through a non-generic one only a difference in `?`
+   * (`k: Int?` for `k: Int`), with a return the bridge can pass on (#2896). Only
+   * when NO base method matches is the override rejected.
    */
   def checkOverrideTargets(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     if clazz.isInterface then return
 
-    // Collect override-marked, non-static, non-private instance methods declared here.
-    val overrideMethods =
-      clazz.methods.filter(m =>
-        AST.hasModifier(m.modifier, AST.M_OVERRIDE) &&
-          !Modifier.isStatic(m.modifier) &&
-          !Modifier.isPrivate(m.modifier))
-    if overrideMethods.isEmpty then return
+    // Collect non-static, non-private instance methods declared here: the override-marked
+    // ones are checked for a target, the others for a `?`-only override (W0029).
+    val instanceMethods = clazz.methods.filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
+    val (overrideMethods, unmarkedMethods) = instanceMethods.partition(m => AST.hasModifier(m.modifier, AST.M_OVERRIDE))
+    if instanceMethods.isEmpty then return
 
     val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself: an override must target a *base* member.
@@ -254,10 +296,18 @@ private[compiler] object DuplicationChecks {
     // Include both the specialized (type-argument substituted) and the raw erased
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
     // One entry per base method: its boxing-aware patterns and its exact descriptors.
-    final case class BaseContract(patterns: Seq[ErasedParameterPattern], exact: Set[String])
+    // `viaBridge`: the supertype is applied (`G[JInteger]`), so codegen bridges a boxed or
+    // primitive form to it. A non-generic supertype is bridged only for a `?` difference
+    // (`plainNames`, with `returnType`); `dec(JInteger)` beside an inherited `dec(Int)` is an
+    // overload that never runs through the base type (#2896).
+    // `concrete`: the base method has a body; `args`: its parameters as declared.
+    final case class BaseContract(
+      patterns: Seq[ErasedParameterPattern], exact: Set[String], viaBridge: Boolean,
+      plainNames: Seq[String], returnType: Type, signature: String,
+      args: Array[Type], concrete: Boolean, isFinal: Boolean, owner: String)
     val baseContracts = mutable.HashMap[(String, Int), mutable.ArrayBuffer[BaseContract]]()
     val baseNames = mutable.HashSet[String]()
-    val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
+    val requestedKeys = instanceMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
     for (view <- views.values) {
       val viewSubst: scala.collection.immutable.Map[String, Type] =
         view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
@@ -270,7 +320,13 @@ private[compiler] object DuplicationChecks {
               contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
             baseContracts.getOrElseUpdate(key, mutable.ArrayBuffer.empty) += BaseContract(
               Seq(parameterPattern(specializedArgs, typing), parameterPattern(contract.arguments, typing)),
-              Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)))
+              Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)),
+              viaBridge = viewSubst.nonEmpty,
+              plainNames = plainNames(contract.arguments), returnType = contract.returnType,
+              signature = signatureForm(contract.name, specializedArgs,
+                TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)),
+              args = contract.arguments, concrete = !Modifier.isAbstract(contract.modifier),
+              isFinal = Modifier.isFinal(contract.modifier), owner = view.raw.name)
       }
     }
 
@@ -284,14 +340,74 @@ private[compiler] object DuplicationChecks {
       def exactSibling(c: BaseContract): Boolean =
         clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
           o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
+      def bridged(c: BaseContract): Boolean =
+        if c.viaBridge then c.patterns.exists(implPattern.overlaps)
+        else questionOnly(c.plainNames, c.returnType, c.args, c.concrete, impl)
       val overridesSomething = candidates.exists(c =>
-        c.patterns.exists(implPattern.overlaps) && (c.exact.contains(implExact) || !exactSibling(c)))
+        c.exact.contains(implExact) || (bridged(c) && !exactSibling(c)))
       if !overridesSomething then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
-        val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
-        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray)
+        val paramDescriptor = impl.arguments.map(sourceForm).mkString(", ")
+        // Same name and arity in a supertype: show what the override would have to match.
+        val nearMisses = candidates.iterator.map(_.signature).distinct.toArray
+        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray, nearMisses)
     }
+
+    // An unmarked method that takes over an inherited method's code only because the two
+    // differ by `?` (`dec(k: Int?)` beside `Base.dec(k: Int)`): it overrides, so a call
+    // through the base runs it. Say so, since nothing in the source does (W0029).
+    if typing.reportingEnabled then
+      for impl <- unmarkedMethods do
+        val implExact = erasedParamDescriptor(impl.arguments)
+        val candidates = baseContracts.getOrElse((impl.name, impl.arguments.length), mutable.ArrayBuffer.empty[BaseContract])
+        // A slot of its own type inherited (row 3, a chain, or an abstract one): not this case.
+        // Nor when the class declares the base method's exact types itself (`f(Int)` beside
+        // `f(Int?)`): that sibling overrides the base, and this one is an overload (row 12).
+        def exactSibling(c: BaseContract): Boolean =
+          clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
+            o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
+        if !candidates.exists(_.exact.contains(implExact)) then
+          candidates.find(c => !c.viaBridge && c.concrete && !c.isFinal && !exactSibling(c) &&
+            questionOnly(c.plainNames, c.returnType, c.args, c.concrete, impl)).foreach { c =>
+            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+            val own = s"${impl.name}(${impl.arguments.map(sourceForm).mkString(", ")})"
+            typing.warningReporter_.setSourceFile(typing.unit_.sourceFile)
+            typing.warningReporter_.report(WarningCategory.UnmarkedNullableOverride, location,
+              s"'$own' overrides '${c.signature}' of ${c.owner}, because the two differ only by '?'; " +
+                "a call through the base type runs it. Mark it 'override', or rename it to keep a separate method")
+          }
+        // The other direction (`dec(k: Int)` beside `Base.dec(k: Int?)`): an overload, so a
+        // call through the base runs the base method, though the two look like an override.
+        // Before #3053 it overrode with a reference return; say so, since nothing else does (W0030).
+        if !candidates.exists(_.exact.contains(implExact)) then
+          candidates.find(c => !c.viaBridge && c.concrete && !c.isFinal && !exactSibling(c) &&
+            c.plainNames == plainNames(impl.arguments) && unboxes(impl.arguments, c.args)).foreach { c =>
+            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+            val own = s"${impl.name}(${impl.arguments.map(sourceForm).mkString(", ")})"
+            typing.warningReporter_.setSourceFile(typing.unit_.sourceFile)
+            typing.warningReporter_.report(WarningCategory.UnmarkedNullableOverload, location,
+              s"'$own' does not override '${c.signature}' of ${c.owner}, because its parameter is not nullable; " +
+                s"a call through ${c.owner} runs ${c.owner}'s method. Make the parameter nullable ('?') to override, " +
+                "or rename it to keep a separate method")
+          }
   }
+
+  // Whether codegen bridges `impl` to the non-generic base method `c` (the same name, the
+  // same parameter types up to `?`), as `BridgeMethodEmitter` does: the return must pass
+  // through, and an own `f(Int)` beside a concrete `f(Int?)` is never bridged: a `null`
+  // through the base would throw (#2896 row 10, #3053).
+  private def questionOnly(
+    basePlainNames: Seq[String], baseReturn: Type, baseArgs: Array[Type], baseConcrete: Boolean, impl: Method
+  ): Boolean =
+    basePlainNames == plainNames(impl.arguments) && bridgeableReturn(baseReturn, impl.returnType) &&
+      !(baseConcrete && unboxes(impl.arguments, baseArgs))
+
+  private def unboxes(own: Array[Type], inherited: Array[Type]): Boolean =
+    own.indices.exists(i => isPrimitiveJvm(own(i)) && !isPrimitiveJvm(inherited(i)))
+
+  private def isPrimitiveJvm(tp: Type): Boolean =
+    val sort = Erasure.asmType(tp).getSort
+    sort != org.objectweb.asm.Type.OBJECT && sort != org.objectweb.asm.Type.ARRAY
 
   /**
    * Reports E0083 when catch clause `index`'s exception type is already covered by an
@@ -336,6 +452,8 @@ private[compiler] object DuplicationChecks {
 
   def checkErasureSignatureCollisions(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     val seen = mutable.HashMap[(String, String), Method]()
+    // A script that lost its container name to a user class is already E0008 (#3060).
+    if typing.scriptOverClassNames.contains(clazz.name) then return
     for m <- clazz.methods do
       val key = (m.name, erasedMethodDesc(m))
       if seen.contains(key) then
@@ -407,17 +525,21 @@ private[compiler] object DuplicationChecks {
 
     // Collect all implemented methods from this class AND all ancestor classes
     // Parent classes may already provide concrete implementations for abstract methods
-    val implByNameAndArity = mutable.HashMap[(String, Int), mutable.ArrayBuffer[Array[String]]]()
+    // Each implementation's parameters: erased descriptors, and the types without `?`.
+    final case class Impl(descs: Array[String], plain: Array[String], method: Method, args: Array[Type])
+    val implByNameAndArity = mutable.HashMap[(String, Int), mutable.ArrayBuffer[Impl]]()
 
-    def registerImplementation(m: Method): Unit = {
+    def descriptorsOf(args: Array[Type]): Array[String] = args.map(arg => Erasure.asmType(arg).getDescriptor)
+
+    def registerImplementation(m: Method, args: Array[Type]): Unit = {
       val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
-      candidates += m.arguments.map(arg => Erasure.asmType(arg).getDescriptor)
+      candidates += Impl(descriptorsOf(args), plainNames(args).toArray, m, args)
     }
 
     // Add this class's own methods
     for m <- clazz.methods do
       if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-        registerImplementation(m)
+        registerImplementation(m, m.arguments)
 
     // Also add concrete methods from parent classes (not just interfaces)
     // Also register each under the view's type arguments: `Base[String]`'s `apply(T)` implements
@@ -427,11 +549,10 @@ private[compiler] object DuplicationChecks {
         view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
       for m <- view.raw.methods do
         if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-          registerImplementation(m)
+          registerImplementation(m, m.arguments)
           if implSubst.nonEmpty then
-            val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
-            candidates += m.arguments.map(arg =>
-              Erasure.asmType(TypeSubstitution.substituteType(arg, implSubst, emptyMethodSubst, defaultToBound = true)).getDescriptor)
+            registerImplementation(m, m.arguments.map(arg =>
+              TypeSubstitution.substituteType(arg, implSubst, emptyMethodSubst, defaultToBound = true)))
 
     // Check all abstract methods from superclasses and interfaces
     for (view <- views.values) {
@@ -445,10 +566,27 @@ private[compiler] object DuplicationChecks {
           val specializedArgs =
             contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
           val pattern = parameterPattern(specializedArgs, typing)
-          val candidates = implByNameAndArity.get((contract.name, specializedArgs.length))
-          if !candidates.exists(_.exists(pattern.accepts)) then
+          // A primitive/boxed difference is bridged only against a generic supertype
+          // (`n(x: Int)` for `G[JInteger]`'s `n(x: T)`, #2559). Against a non-generic one,
+          // `n(x: Int)` beside `n(x: JInteger)` is an overload (#2896's row 5): nothing
+          // implements the contract, and the call threw AbstractMethodError (#2922). Only a
+          // parameter that differs by `?` alone (`Int?` for `Int`) is bridged there.
+          val contractDescs = descriptorsOf(specializedArgs)
+          val contractPlain = plainNames(specializedArgs).toArray
+          def bridged(impl: Impl): Boolean =
+            viewSubst.nonEmpty || impl.descs.indices.forall(i =>
+              impl.descs(i) == contractDescs(i) || impl.plain(i) == contractPlain(i))
+          val candidates = implByNameAndArity.getOrElse((contract.name, specializedArgs.length), mutable.ArrayBuffer.empty)
+          val matching = candidates.filter(impl => pattern.accepts(impl.descs))
+          if !matching.exists(bridged) then
             val paramDescriptor = specializedArgs.map(_.name).mkString(", ")
-            typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
+            def shown(args: Array[Type]): String = s"${contract.name}(${args.map(sourceForm).mkString(", ")})"
+            matching.headOption match
+              case Some(nearMiss) =>
+                typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor,
+                  shown(nearMiss.args), shown(specializedArgs))
+              case None =>
+                typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
       }
     }
   }

@@ -98,7 +98,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     val histories = historiesOf(chain, interfaces)
     val relations = for {
       h <- histories
-      (field, op) <- HistoryPreorder.simpleRelations(h)
+      (field, op) <- fieldRelations(h, fieldTypes(chain).keySet)
     } yield (field, op)
     if (relations.nonEmpty) {
       val perMethod: Seq[(AST.MethodDeclaration, Seq[Write])] =
@@ -137,7 +137,8 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     def holder(h: AST.Expression, among: Seq[AST.ClassDeclaration], default: AST.ClassDeclaration) =
       among.find(_.histories.exists(_ eq h)).getOrElse(default)
     def relationsOf(hs: Seq[AST.Expression], among: Seq[AST.ClassDeclaration], default: AST.ClassDeclaration) =
-      for (h <- hs; (f, op) <- HistoryPreorder.simpleRelations(h)) yield (f, op, fieldOwner(holder(h, among, default), f))
+      for (h <- hs; (f, op) <- HistoryPreorder.simpleRelations(h); owner = fieldOwner(holder(h, among, default), f)
+           if owner.isDefined) yield (f, op, owner)
     lazy val added = relationsOf(histories, chain, cls).distinct
     val parentChain = chain.drop(1)
     lazy val parentHistories = historiesOf(parentChain, interfaces)
@@ -181,9 +182,9 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
         for {
           h <- histories if !parentHistories.exists(sameClause(_, h))
           from = holder(h, chain, cls)
-          c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
+          c <- conjuncts(h) if fieldRelations(c, fields).isEmpty
           named = namesIn(c).filter(f => fields.contains(f) && fieldOwner(from, f) == fieldOwner(owner, f))
-          if named.nonEmpty || callsAny(c)
+          if named.nonEmpty || callsAny(c, fields)
           w <- writes.find(w => named.exists(w.ofField(m, _)))
         } unchecked += Unchecked(file, owner, m, w.field, None, line = lineOf(h), fieldType = None, at = w.node.location)
       }
@@ -411,9 +412,9 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     val fields = fieldTypes(chain).keySet
     for {
       h <- histories
-      c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
+      c <- conjuncts(h) if fieldRelations(c, fields).isEmpty
       named = namesIn(c).filter(fields.contains)
-      if named.nonEmpty || callsAny(c)
+      if named.nonEmpty || callsAny(c, fields)
       m <- methodsOf(cls) if m.block != null
       // A history over method calls (`x() >= old(x())`) names no field, so any write may break it (#2735).
       w <- writesIn(m, cls).find(w => if (named.isEmpty) fields.contains(w.field) else named.exists(w.ofField(m, _)))
@@ -425,7 +426,19 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     case other                   => Seq(other)
   }
 
-  /** A conjunct with no field and no call (`1 >= 0`) reads no state, so no write can break it (#2901). */
+  /**
+   * The `x OP old(x)` relations whose `x` is a field. A bare name that is no field is a paren-less
+   * method call (`snap >= old(snap)` is `snap() >= old(snap())`), which no write names (#3033).
+   */
+  private def fieldRelations(e: AST.Expression, fields: Set[String]): List[(String, String)] =
+    HistoryPreorder.simpleRelations(e).filter { case (f, _) => fields.contains(f) }
+
+  /**
+   * A conjunct with no field and no call (`1 >= 0`) reads no state, so no write can break it (#2901).
+   * A bare name that is no field is a paren-less call (#3033).
+   */
+  private def callsAny(e: AST.Node, fields: Set[String]): Boolean = namesIn(e).exists(!fields.contains(_)) || callsAny(e)
+
   private def callsAny(e: AST.Node): Boolean = {
     var found = false
     def visit(n: AST.Node): Unit = {

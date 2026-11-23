@@ -989,6 +989,20 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     read(file) shouldBe source
     result.stderr should include("old.on:3:28: this `self` may be the retired spelling of `this`")
 
+  test("a directory whose joint compile hits the error cap never reports an old file as compiling (#3115)"):
+    val root = Files.createTempDirectory("onion-migrate-cap").toRealPath()
+    // 1100 unrelated scripts that declare the same class: one duplicate-class error each, past
+    // the compiler's cap of 1000, so the old file's own error may not be reported.
+    (1 to 1100).foreach(i => Files.writeString(root.resolve(f"a$i%04d.on"), "class Dup {}\n", UTF_8))
+    val old = root.resolve("zold.on")
+    Files.writeString(old, OldScript, UTF_8)
+
+    val result = invoke(root, root.toString)
+
+    result.stdout should not include "compiles as written"
+    result.stdout should include("1 file(s) need a manual change")
+    result.exitCode shouldBe 1
+
   test("duplicate errors do not hide the error cap, so an old file is not reported as compiling (#3214)"):
     val root = Files.createTempDirectory("onion-migrate-cap-dup").toRealPath()
     // Each script reports the same error twice (a lambda typed once per overload candidate);

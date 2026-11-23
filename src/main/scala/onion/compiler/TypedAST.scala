@@ -486,6 +486,11 @@ object TypedAST {
      */
     var isTopLevelContainer: Boolean = false
 
+    /** For an `extension` block's synthetic container: the receiver as the block wrote it
+     *  (`List[Int]`, `Big_Box`), so a diagnostic names `List[Int].shout`, not the mangled
+     *  class name (#3009). */
+    var extensionReceiverName: Option[String] = None
+
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
@@ -862,6 +867,8 @@ object TypedAST {
     var frame: LocalFrame = _
     /** As MethodDefinition.mayContainTry, for the closure's own body. */
     var mayContainTry: Boolean = true
+    /** The body's only value is `null`, so its result type was widened to Object (#3018). */
+    var producesOnlyNull: Boolean = false
 
     def this(`type`: TypedAST.ClassType, method: TypedAST.Method, block: TypedAST.ActionStatement) = {
       this(null, `type`, method, block)

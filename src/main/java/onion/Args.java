@@ -121,12 +121,18 @@ public final class Args {
 
         /**
          * Integer-valued option with a default. The default is used only when the option is
-         * absent; a value that is not an {@code int} throws {@link IllegalArgumentException}.
+         * absent; a bare {@code --name} with no value, or a value that is not an {@code int}, throws {@link IllegalArgumentException}.
          */
         public int intOption(String name, int defaultValue) {
             askedOption.add(name);
             String v = options.get(name);
-            if (v == null) return defaultValue;
+            if (v == null) {
+                if (flags.contains(name)) {
+                    throw new IllegalArgumentException(
+                        "missing value for --" + name + " (expected Int)");
+                }
+                return defaultValue;
+            }
             try {
                 return Integer.parseInt(v);
             } catch (NumberFormatException e) {

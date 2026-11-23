@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.165.0] - 2026-11-23
+
+### Breaking
+
+- **A lambda that ends in an `if`/`select`/`try` is checked against the call's target type.**
+  - Before: `val c: Option[Int] = ch2(() -> { if b { other } else { tail } })` (`ch2[U](f: () -> U)`, `other: Option[String]`) compiled, then threw `ClassCastException` where `c` was read. A `List[String]` branch into a `List[Object]` target ran.
+  - Now: E0000 at the branch that does not fit. A nullable target (`Option[Int]?`) is unchanged. See `docs/migration/pre-1.0.md` (#3241).
+- **An `if`/`else` of `Option[String]` and `Option[Int]` is no longer an `Option[Int]`.**
+  - Before: passed as a call argument, returned from a lambda for a non-generic parameter, or kept in an untyped `val`, it compiled as `Option[Int]` and threw `ClassCastException` on read.
+  - Now: E0000 at the branch that does not fit. With no target the join is `Option[?]`, which fits `Object` and nothing narrower. See `docs/migration/pre-1.0.md` (#3255, #3247).
+- **`["a": 1, "b": null]` with no expected type is now a `Map[String, Int?]`, not a `Map[String, Int]`.**
+  - Before: `t(["a": 1, "b": null])` compiled for a `Map[String, Int]` parameter, then crashed at the read.
+  - Now: E0005, as for a list literal. Declare the parameter `Map[String, Int?]`, or drop the `null`.
+- **A named call above overloads declared later picks what a call below them picks (#3110).**
+  - `f(x = 1)` above `def f(x: Int)` and `def f(x: Long, y: Int = 2)` ran the `Long` overload, now the `Int` one.
+  - Above `f(x: Int)` and `f(x: Int, y: Int = 2)`, `f(x = 1)` is now E0006; above `def b(x: Int, y: Int)`, `b(arg0 = 1, arg1 = 2)` is now E0043.
+  - No `onion migrate` rule; see `docs/migration/pre-1.0.md`.
+- **`override def f(k: Int): String` over a base `f(k: Int?): String` is E0068 (#3053).**
+  - Before: it compiled as an override, and `b.f(null)` through the base type threw inside the generated bridge.
+  - Now: it is an overload for every return type, as it already was for `void` and primitives. With `override` it is **E0068**; make the parameter `Int?` to override, or drop `override` to keep the overload.
+  - No `onion migrate` rule: only you know whether it was meant to replace the base method. See `docs/migration/pre-1.0.md`.
+- **Without `override`, the same `f(k: Int): String` now runs the base method through the base type, and warns W0030 (#3053).**
+  - Before: `val b: Base = new Up(); b.f(1)` ran `Up.f`.
+  - Now: it runs `Base.f`, and the compiler warns `'f(Int)' does not override 'f(Int?): String' of Base`. Make the parameter `Int?` to keep the override.
+
+### Fixed
+
+- **`Yaml::parse("- 1\n- 2")` says a sequence of scalars is out of scope (#3274).**
+  - Before: `Expected 'key: value' but found no colon: 1`, as if the file were malformed.
+  - Now: the message names the scope limit and points to `Json`, like the other out-of-scope cases.
+- **W0028 no longer prints an empty example.**
+  - Before: `can break its ensures: for example when .`
+  - Now: `can break its ensures: for every call.` when the body breaks the clause for any input.
+- **A `@TailRecursive` method of a `final` class or a record becomes a loop (#3256).**
+  - Before: it was treated as overridable, so deep recursion overflowed the stack, and W0016 said "it can be overridden".
+  - Now: no subclass can exist, so it is rewritten like a `final` method, with no warning.
+- **A `@TailRecursive` group call through another object keeps that object.**
+  - Before: `return mk().b(n - 1)` became a jump inside the group, so `mk()` never ran and a `null` receiver did not throw.
+  - Now: only a call on `this` (or a static call) becomes a jump; any other call runs as written.
+- **`Net` `readLine` after a timed-out `readAll` splits the saved bytes into lines.**
+  - Before: `a\nb` kept by the timeout came back as one "line" with a newline inside.
+  - Now: `a`, then `bc`, then `d`, as if no timeout had happened.
+- **`file(p).readLossless(shape)` hands a user-written shape the text without the file's BOM, as `read(shape)` does.**
+  - Before: a file `﻿alice` gave `read` `alice` (5) but `readLossless` `﻿alice` (6).
+  - Now: both give `alice`, and `render()` writes the BOM back, so the file still round-trips byte for byte.
+- **`xs.fold(0) { acc, x -> acc + x }` on a `List[Int]` no longer warns W0015 (#3209).**
+  - Before: W0015 ("NullPointerException at runtime") on every sum, including 21 of the first 40 `run/` samples that call `fold(0`.
+  - Now: no warning when the start value is a primitive and the lambda returns only primitives (`reduce(0, ..)` and `Iterables::foldl` too). A lambda returning a Java value such as `m.get(k)` keeps W0015.
+- **`DateTime::parse(s, "…hh:mm…")` without an `a` field is an error, not midnight.**
+  - Before: `"2026-11-11T09:30Z"` with `hh` silently dropped the time and returned midnight.
+  - Now: `IllegalArgumentException` saying a 12-hour field needs an am/pm field `a`.
+- **A `void` `@TailRecursive` mutual group is stack-safe.**
+  - Before: `a(n - 1)` as a bare statement in tail position was not seen as a tail call, so a deep group overflowed the stack with no W0016.
+  - Now: it runs as a loop, like the `return b(..)` form.
+- **Named arguments work on a callable declared later in the file.**
+  - Before: `def a(k: Int): Int = b(y = 1, x = k)` above `def b(x: Int, y: Int)` was E0043 "unknown parameter name". So was a call to a later class, or a later method in a record, enum or interface body.
+  - Now: it compiles and binds by name, as when the callee comes first.
+- **`opts.intOption("count", 3)` now fails on a bare `--count`.**
+  - Before: returned the default `3`, so a forgotten value ran silently.
+  - Now: `IllegalArgumentException: missing value for --count (expected Int)`, like the auto-CLI.
+- **A script whose container name equals a class in another file gets one E0008 naming both files.**
+  - Before: `j1/y.on` (`class yMain`) plus `e2/y.on` (top-level code) printed an E0008 naming only `y.on`, then an E0035 about `yMain.start`.
+  - Now: one E0008 saying `e2/y.on` would become `yMain` and `j1/y.on` declares it; the E0035 is gone.
+- **`Text::wrap` no longer ends a line with `「` that is followed by a space.**
+  - Before: `Text::wrap("あいう「 えお", 4)` gave `[あい, う「, えお]`.
+  - Now: the bracket moves down with the next character, as the docs say.
+- **A lone `@TailRecursive` method that cannot become a loop now warns W0016 (#3032).**
+  - Before: a public, overridable `@TailRecursive def sum(..)` compiled silently, then overflowed the stack.
+  - Now: W0016 says why (for example, make it private, static or final).
+- **An `instance` declared through an import alias is found by `[T: Trait]`.**
+  - Before: `import { lib.Sh as S }` + `instance S[Integer]` gave E0003 at the call.
+  - Now: the alias names the same trait, so the program prints `I5`.
+
 ## [0.164.0] - 2026-11-22
 
 ### Breaking

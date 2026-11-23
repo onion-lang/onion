@@ -4385,6 +4385,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-join-of-different-type-arguments-is-option-not-a-raw-option-3255-3247" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A join of different type arguments is Option[?], not a raw Option (#3255, #3247)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-named-call-above-its-callee-binds-by-name-as-a-call-below-it-does-3110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A named call above its callee binds by name, as a call below it does (#3110)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5358,6 +5380,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-join-of-different-type-arguments-is-option-not-a-raw-option-3255-3247" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A join of different type arguments is Option[?], not a raw Option (#3255, #3247)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-named-call-above-its-callee-binds-by-name-as-a-call-below-it-does-3110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A named call above its callee binds by name, as a call below it does (#3110)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5505,7 +5549,7 @@ and the program then threw a <code>ClassCastException</code> on the next read.</
 <li><strong><code>this</code> is a <code>Mid[U]</code>:</strong> inside <code>class Mid[U]</code>, <code>this</code> keeps <code>U</code>, also through
   <code>val me = this</code>, <code>id(this)</code>, <code>[this]</code> or <code>() -&gt; this</code>. So <code>same(this)</code> fits an inherited
   <code>same(o: Box[T])</code>, and <code>me.get()</code> is a <code>U</code> (it was raw <code>Mid</code>, so <code>me.get()</code> was an <code>Object</code>).</li>
-<li><strong>Branches with different type arguments:</strong> <code>if b { [t] } else { [u] }</code> is a raw <code>List</code>.
+<li><strong>Branches with different type arguments:</strong> <code>if b { [t] } else { [u] }</code> is a <code>List[?]</code> (#3255).
   It compiles where an <code>Object</code> is expected; where a <code>List[T]</code> is expected, the <code>[u]</code> branch is
   <code>E0000</code>.</li>
 <li><strong>No <code>onion migrate</code> rule, on purpose:</strong> the only mechanical rewrite is inserting
@@ -6134,9 +6178,17 @@ now, with or without <code>override</code>:</p>
   and never decides which method runs. Without <code>override</code>, the compiler warns <strong>W0029</strong>
   (<code>'dec(Int?)' overrides 'dec(Int): void' of Base ...</code>). Over a <code>final</code> base method this is
   <strong>E0039</strong>, as for the exact types (<code>setDaemon(on: Boolean?)</code> in a <code>Thread</code> subclass included).</li>
-<li><strong>The other direction is unchanged:</strong> an own <code>f(k: Int): void</code> beside a base
-  <code>f(k: Int?): void</code> stays an overload, so <code>null</code> through <code>Base</code> still reaches the base
-  method. Marked <code>override</code>, it is <strong>E0068</strong>; make the parameter <code>Int?</code> to override.</li>
+<li><strong>The other direction is never an override (#3053):</strong> an own <code>f(k: Int)</code> beside a base
+  <code>f(k: Int?)</code> is an overload for every return type, so <code>null</code> through <code>Base</code> reaches the
+  base method. Before, with a reference return (<code>String</code>) it overrode through a bridge that
+  unboxed, and <code>null</code> through <code>Base</code> threw. Marked <code>override</code>, it is <strong>E0068</strong>; make the
+  parameter <code>Int?</code> to override, or remove <code>override</code> to keep the overload.</li>
+<li><strong>Unmarked, it now warns W0030</strong>, since <code>b.f(1)</code> through <code>Base</code> silently changed from the
+  own method to the base one (<code>Up</code> → <code>Base</code>):
+  <code>'f(Int)' does not override 'f(Int?): String' of Base ...</code>. Make the parameter <code>Int?</code> to
+  override, or rename the method to keep the overload.</li>
+<li><strong>Known exception:</strong> a chain <code>A.f(Int)</code>, <code>B.f(Int?)</code> (<code>override</code>), <code>C.f(Int): String</code>
+  (<code>override</code>) still bridges, so <code>null</code> through <code>B</code> can still throw there.</li>
 <li><strong>To silence W0029:</strong> add <code>override</code> if the method is meant to replace the base one.</li>
 <li><strong>To keep a separate overload:</strong> rename the method (<code>decOrSkip(k: Int?)</code>). No <code>onion
   migrate</code> rule: only you know whether the method was meant to replace the base one.</li>
@@ -6351,8 +6403,9 @@ the nullable type, so the <code>null</code> is visible to the checker.</p>
   once, as in the two <code>sort</code> rows above. The <code>!!</code> there never fails.</li>
 <li><strong>A target type still works:</strong> <code>val ys: List[Int?] = [1, null]</code>. <code>List[Int]</code> is rejected, as the <code>null</code> does not fit.</li>
 <li><strong>Unchanged:</strong> <code>[null]</code>, <code>[null, null]</code>, and a literal whose expected type is already known.</li>
-<li><strong>Known remaining gap:</strong> a map literal with a <code>null</code> value, such as <code>["a": "x", "b": null]</code>, still
-  infers a non-null value type. That is #3201, a separate change with its own migration row.</li>
+<li><strong>Map literals too (#3201):</strong> <code>["a": "x", "b": null]</code> with no expected type is a
+  <code>Map[String, String?]</code>. <code>t(["a": 1, "b": null])</code> with <code>t(m: Map[String, Int])</code> was
+  compiled and crashed at the read; it is now E0005. Take <code>Map[String, Int?]</code>, or drop the <code>null</code>.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> deciding what to do with a <code>null</code> (skip it, default it,
   reject it) depends on the program. The edits above show each choice.</li>
 </ul>
@@ -6493,15 +6546,121 @@ applied target type, each branch is checked against it.</p>
 <td>E0000</td>
 <td>the same</td>
 </tr>
+<tr>
+<td><code>val lo: List[Object] = ch2(() -&gt; if b { objs } else { strs })</code> (a lambda for a generic <code>() -&gt; U</code> parameter)</td>
+<td>compiled and ran (<code>List</code> is invariant, so it was never sound)</td>
+<td>E0000 at <code>strs</code></td>
+<td>widen the branch to <code>List[Object]</code>, or use a wider target</td>
+</tr>
 </tbody>
 </table>
 <ul>
 <li><strong>What you see:</strong> E0000 (<code>type Option[Int] is expected, but type Option[String] is used</code>),
   with the caret at the branch that does not fit.</li>
 <li><strong>Unchanged:</strong> branches that fit the target, a target such as <code>Object</code>, and a join with
-  no target (<code>val c = if b { other } else { tail }</code> is still a raw <code>Option</code>).</li>
+  no target (<code>val c = if b { other } else { tail }</code> is an <code>Option[?]</code>; see #3255 below).</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> the program holds a value of the wrong type, and only you
   know which branch is wrong. The error points at it.</li>
+</ul>
+<h2 id="a-join-of-different-type-arguments-is-option-not-a-raw-option-3255-3247">A join of different type arguments is <code>Option[?]</code>, not a raw <code>Option</code> (#3255, #3247)<a class="headerlink" href="#a-join-of-different-type-arguments-is-option-not-a-raw-option-3255-3247" title="Permanent link">&para;</a></h2>
+<p>Branches of one generic class with different type arguments joined as the raw class,
+and a raw value fits any <code>Option[Int]</code>. Now the join is <code>Option[?]</code>, which fits <code>Object</code>
+and nothing narrower. This closes the positions #3241 did not reach.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">tail</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// Option[?]</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w">                 </span><span class="c1">// Before: compiled. Now: E0000</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Program</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep it compiling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f(if b { other } else { tail })</code> with <code>f(x: Option[Int])</code></td>
+<td>compiled; <code>ClassCastException</code> on read</td>
+<td>E0000 at <code>other</code></td>
+<td>give both branches the parameter's type</td>
+</tr>
+<tr>
+<td><code>chk { if b { other } else { tail } }</code> with <code>chk(f: () -&gt; Option[Int])</code></td>
+<td>compiled</td>
+<td>E0000 at <code>other</code></td>
+<td>the same</td>
+</tr>
+<tr>
+<td><code>val x = if b { other } else { tail }; val c: Option[Int] = x</code></td>
+<td>compiled</td>
+<td>E0000</td>
+<td>annotate <code>x</code>, or give both branches one type</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> with a target, E0000 at the branch that does not fit, naming its type
+  (<code>Option[String]</code>). With no target, E0000 where the value is used, naming <code>Option[?]</code>. A call
+  to an overloaded function is E0005 naming <code>Option[?]</code>.</li>
+<li><strong>Unchanged:</strong> a target such as <code>Object</code>, calling a method on the join (<code>j.map { x -&gt; .. }</code>
+  sees an <code>Object</code> element), and branches that fit.</li>
+<li><strong>An empty branch takes the other type:</strong> <code>f(if b { some(1) } else { none() })</code>,
+  <code>g(if b { [1, 2] } else { [] })</code> and <code>val x = if b { some(1) } else { none() }</code> still compile;
+  <code>none()</code>, <code>[]</code> and <code>[:]</code> take the parameter's type, or the other branch's.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the value had the wrong type, and only you know which branch to fix.</li>
+</ul>
+<h2 id="a-named-call-above-its-callee-binds-by-name-as-a-call-below-it-does-3110">A named call above its callee binds by name, as a call below it does (#3110)<a class="headerlink" href="#a-named-call-above-its-callee-binds-by-name-as-a-call-below-it-does-3110" title="Permanent link">&para;</a></h2>
+<p>A call with named arguments can now reach a function or method declared later in the file.
+Before, a later overload had no parameter names yet, so it dropped out of named-argument
+resolution, or matched placeholder names. A named call above a set of overloads now picks
+the overload a call below them picks.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">a</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">200</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="nf">println</span><span class="p">(</span><span class="nf">a</span><span class="p">())</span><span class="w">   </span><span class="c1">// Before: 200. Now: 100, as when a() is declared below f</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Callee (declared below the call)</th>
+<th>Call</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep the old result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f(x: Int)</code>, <code>f(x: Long, y: Int = 2)</code></td>
+<td><code>f(x = 1)</code></td>
+<td><code>200</code></td>
+<td><code>100</code></td>
+<td><code>f(x = 1L)</code></td>
+</tr>
+<tr>
+<td><code>f(x: Int)</code>, <code>f(x: Int, y: Int = 2)</code></td>
+<td><code>f(x = 1)</code></td>
+<td><code>200</code></td>
+<td>E0006</td>
+<td><code>f(x = 1, y = 2)</code></td>
+</tr>
+<tr>
+<td><code>b(x: Int, y: Int)</code></td>
+<td><code>b(arg0 = 1, arg1 = 2)</code></td>
+<td><code>12</code></td>
+<td>E0043</td>
+<td><code>b(x = 1, y = 2)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> a different overload runs with no message, <strong>E0006</strong>
+  <code>method call is applicable for both …</code>, or <strong>E0043</strong>
+  <code>unknown parameter name: arg0</code>.</li>
+<li><strong>Still fine:</strong> a named call below its callee, and a call with positional arguments only.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the silent case is found only by resolving the call the old
+  way, and only you know which overload you meant. The table shows each edit.</li>
 </ul>
 
 

@@ -2471,6 +2471,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#option-option-3255-3247" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型引数が異なる分岐の合流は、生の Option ではなく Option[?] になります (#3255, #3247)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5379,6 +5390,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#option-option-3255-3247" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型引数が異なる分岐の合流は、生の Option ではなく Option[?] になります (#3255, #3247)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5521,7 +5543,7 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong><code>this</code> は <code>Mid[U]</code> です:</strong> <code>class Mid[U]</code> の中の <code>this</code> は <code>U</code> を保ちます。
   <code>val me = this</code>、<code>id(this)</code>、<code>[this]</code>、<code>() -&gt; this</code> を通しても同じです。
   そのため <code>same(this)</code> は継承した <code>same(o: Box[T])</code> に渡せ、<code>me.get()</code> は <code>U</code> です（以前は raw な <code>Mid</code> で、<code>me.get()</code> は <code>Object</code> でした）。</li>
-<li><strong>型引数が異なる分岐:</strong> <code>if b { [t] } else { [u] }</code> は raw な <code>List</code> になります。
+<li><strong>型引数が異なる分岐:</strong> <code>if b { [t] } else { [u] }</code> は <code>List[?]</code> になります (#3255)。
   <code>Object</code> が期待される場所ではコンパイルできます。<code>List[T]</code> が期待される場所では、<code>[u]</code> の分岐が <code>E0000</code> になります。</li>
 <li><strong><code>onion migrate</code> の書き換え規則はありません（意図的です）:</strong> 機械的にできる書き換えは <code>(u as T)</code> の挿入だけです。
   それでは、この検査が見つけるバグをそのまま隠してしまいます。エラーを一つずつ読んで判断してください。</li>
@@ -6066,7 +6088,9 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <ul>
 <li><strong>以前:</strong> <code>override</code> のない <code>def dec(k: Int?): void</code> は、基底の <code>dec(k: Int): void</code> とは別のオーバーロードでした。<code>Base</code> を通した <code>b.dec(1)</code> は基底を実行していました。戻り値が参照型（<code>String</code>）なら、同じメソッドがすでにオーバーライドしていました。つまり <code>override</code> は、参照型の戻り値では何も変えず、<code>void</code> やプリミティブの戻り値では結果を決めていました。</li>
 <li><strong>今:</strong> どの戻り値型でもオーバーライドします。<code>override</code> は、型が完全に同じときと同じく検査だけをします。どのメソッドが実行されるかは決めません。<code>override</code> がなければ、コンパイラは <strong>W0029</strong> で警告します（<code>'dec(Int?)' overrides 'dec(Int): void' of Base ...</code>）。基底メソッドが <code>final</code> なら、型が完全に同じときと同じく <strong>E0039</strong> です（<code>Thread</code> のサブクラスの <code>setDaemon(on: Boolean?)</code> も含みます）。</li>
-<li><strong>逆向きは変わりません:</strong> 基底の <code>f(k: Int?): void</code> に対する自前の <code>f(k: Int): void</code> は、オーバーロードのままです。そのため、<code>Base</code> を通した <code>null</code> は基底のメソッドに届きます。<code>override</code> を付けると <strong>E0068</strong> です。オーバーライドするなら、パラメータを <code>Int?</code> にしてください。</li>
+<li><strong>逆向きはオーバーライドになりません (#3053):</strong> 基底の <code>f(k: Int?)</code> に対する自前の <code>f(k: Int)</code> は、戻り値の型にかかわらずオーバーロードです。そのため、<code>Base</code> を通した <code>null</code> は基底のメソッドに届きます。以前は戻り値が参照型 (<code>String</code>) だと、アンボックスするブリッジ経由でオーバーライドになり、<code>Base</code> を通した <code>null</code> で例外が出ました。<code>override</code> を付けると <strong>E0068</strong> です。オーバーライドするなら、パラメータを <code>Int?</code> にしてください。オーバーロードのままにするなら <code>override</code> を外してください。</li>
+<li><strong><code>override</code> がなければ、今は W0030 で警告します:</strong> <code>Base</code> を通した <code>b.f(1)</code> が、警告なしに自前のメソッドから基底のメソッドに変わったためです（<code>Up</code> → <code>Base</code>）。メッセージは <code>'f(Int)' does not override 'f(Int?): String' of Base ...</code> です。オーバーライドするなら、パラメータを <code>Int?</code> にしてください。オーバーロードのままにするなら、メソッドの名前を変えてください。</li>
+<li><strong>既知の例外:</strong> <code>A.f(Int)</code>、<code>B.f(Int?)</code>（<code>override</code>）、<code>C.f(Int): String</code>（<code>override</code>）という継承の連鎖は、まだブリッジでつながります。そのため、<code>B</code> を通した <code>null</code> はそこで例外を出すことがあります。</li>
 <li><strong>W0029 を消すには:</strong> 基底のメソッドを置き換えるつもりなら、<code>override</code> を付けてください。</li>
 <li><strong>別のオーバーロードとして残すには:</strong> メソッドの名前を変えてください（<code>decOrSkip(k: Int?)</code>）。<code>onion migrate</code> の規則はありません。基底のメソッドを置き換えるつもりだったかどうかは、書いた人にしか分かりません。</li>
 </ul>
@@ -6253,7 +6277,7 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>要素型に対する Java の比較器:</strong> <code>nullsFirst</code> は、包んだ比較器に <code>null</code> を渡しません。しかし、そのシグネチャではそれを表せません。上の二つの <code>sort</code> の行のように、型引数 <code>String?</code> を一度だけ書きます。そこでの <code>!!</code> が失敗することはありません。</li>
 <li><strong>型を明示すれば今までどおり書けます:</strong> <code>val ys: List[Int?] = [1, null]</code>。<code>null</code> が入らないため <code>List[Int]</code> は拒否されます。</li>
 <li><strong>変わらないもの:</strong> <code>[null]</code>、<code>[null, null]</code>、期待される型が分かっているリテラルです。</li>
-<li><strong>残っている差:</strong> <code>["a": "x", "b": null]</code> のように <code>null</code> の値を含むマップリテラルは、今も non-null の値型になります。これは #3201 で、別の変更として移行表の行も別に用意します。</li>
+<li><strong>マップリテラルも同じです (#3201):</strong> 期待される型がないとき、<code>["a": "x", "b": null]</code> は <code>Map[String, String?]</code> になります。<code>t(m: Map[String, Int])</code> に <code>t(["a": 1, "b": null])</code> を渡すと、以前はコンパイルが通って読み取りで落ちていました。今は E0005 です。引数を <code>Map[String, Int?]</code> にするか、<code>null</code> を取り除きます。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> <code>null</code> をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。</li>
 </ul>
 <h2 id="fx-fxs-java-2955"><code>f(x)</code> と <code>f(xs...)</code> に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)<a class="headerlink" href="#fx-fxs-java-2955" title="Permanent link">&para;</a></h2>
@@ -6394,15 +6418,120 @@ Onion も同じ動作になりました。</p>
 <td>E0000</td>
 <td>同上</td>
 </tr>
+<tr>
+<td><code>val lo: List[Object] = ch2(() -&gt; if b { objs } else { strs })</code>（総称の <code>() -&gt; U</code> 引数に渡すラムダ）</td>
+<td>コンパイルでき、動いた（<code>List</code> は不変なので、もともと型安全ではなかった）</td>
+<td><code>strs</code> で E0000</td>
+<td>分岐を <code>List[Object]</code> にそろえるか、広い型にする</td>
+</tr>
 </tbody>
 </table>
 <ul>
 <li><strong>表示されるもの:</strong> E0000（<code>type Option[Int] is expected, but type Option[String] is used</code>）です。
   キャレットは型の合わない分岐を指します。</li>
 <li><strong>今までどおり動くもの:</strong> 期待される型に合う分岐、<code>Object</code> のような期待される型、
-  期待される型のない合流です（<code>val c = if b { other } else { tail }</code> は今も原型の <code>Option</code> です）。</li>
+  期待される型のない合流です（<code>val c = if b { other } else { tail }</code> は <code>Option[?]</code> です。下の #3255 を参照）。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> プログラムが間違った型の値を持っています。
   どの分岐が間違いかは書いた人にしか分かりません。エラーがその分岐を指します。</li>
+</ul>
+<h2 id="option-option-3255-3247">型引数が異なる分岐の合流は、生の <code>Option</code> ではなく <code>Option[?]</code> になります (#3255, #3247)<a class="headerlink" href="#option-option-3255-3247" title="Permanent link">&para;</a></h2>
+<p>同じジェネリッククラスで型引数が異なる分岐は、生のクラスに合流していました。
+生の値はどの <code>Option[Int]</code> にも入ります。今後の合流は <code>Option[?]</code> で、<code>Object</code> にだけ入ります。</p>
+<h1 id="3241_1">3241 が対象にしなかった位置も塞ぎます。<a class="headerlink" href="#3241_1" title="Permanent link">&para;</a></h1>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">tail</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// Option[?]</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w">                 </span><span class="c1">// 以前: コンパイルできた。今後: E0000</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>プログラム</th>
+<th>以前</th>
+<th>今後</th>
+<th>コンパイルを保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f(x: Option[Int])</code> に <code>f(if b { other } else { tail })</code></td>
+<td>コンパイルでき、読み出しで <code>ClassCastException</code></td>
+<td><code>other</code> で E0000</td>
+<td>両方の分岐を引数の型に合わせます</td>
+</tr>
+<tr>
+<td><code>chk(f: () -&gt; Option[Int])</code> に <code>chk { if b { other } else { tail } }</code></td>
+<td>コンパイルできた</td>
+<td><code>other</code> で E0000</td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>val x = if b { other } else { tail }; val c: Option[Int] = x</code></td>
+<td>コンパイルできた</td>
+<td>E0000</td>
+<td><code>x</code> に型を付けるか、分岐の型をそろえます</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示:</strong> 期待される型があれば、型の合わない分岐で E0000 になり、その型（<code>Option[String]</code>）を示します。
+  期待される型がなければ、値を使う所で <code>Option[?]</code> を示す E0000 になります。
+  多重定義された関数の呼び出しでは、<code>Option[?]</code> を示す E0005 になります。</li>
+<li><strong>変わらないもの:</strong> <code>Object</code> などの対象、合流した値のメソッド呼び出し（<code>j.map { x -&gt; .. }</code> の要素は <code>Object</code> です）、型が合う分岐です。</li>
+<li><strong>空の分岐はもう一方の型になります:</strong> <code>f(if b { some(1) } else { none() })</code>、
+  <code>g(if b { [1, 2] } else { [] })</code>、<code>val x = if b { some(1) } else { none() }</code> は今もコンパイルできます。
+  <code>none()</code>・<code>[]</code>・<code>[:]</code> は引数の型か、もう一方の分岐の型になります。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 値の型が誤っているため、どの分岐を直すかは書いた人にしか分かりません。</li>
+</ul>
+<h2 id="3110">後で宣言された呼び出し先にも、名前付き引数が名前で結び付くようになりました (#3110)<a class="headerlink" href="#3110" title="Permanent link">&para;</a></h2>
+<p>名前付き引数の呼び出しが、ファイル内で後に宣言された関数やメソッドに届くようになりました。
+以前は、後の多重定義にはまだ引数名がありませんでした。
+そのため、名前付き引数の解決から外れるか、仮の引数名に一致していました。
+現在、多重定義より上にある名前付きの呼び出しは、下にある呼び出しと同じ多重定義を選びます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">a</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">200</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="nf">println</span><span class="p">(</span><span class="nf">a</span><span class="p">())</span><span class="w">   </span><span class="c1">// 以前: 200。現在: 100（a() を f の下に書いたときと同じ）</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>呼び出し先（呼び出しより下で宣言）</th>
+<th>呼び出し</th>
+<th>以前</th>
+<th>現在</th>
+<th>以前の結果を保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f(x: Int)</code>, <code>f(x: Long, y: Int = 2)</code></td>
+<td><code>f(x = 1)</code></td>
+<td><code>200</code></td>
+<td><code>100</code></td>
+<td><code>f(x = 1L)</code></td>
+</tr>
+<tr>
+<td><code>f(x: Int)</code>, <code>f(x: Int, y: Int = 2)</code></td>
+<td><code>f(x = 1)</code></td>
+<td><code>200</code></td>
+<td>E0006</td>
+<td><code>f(x = 1, y = 2)</code></td>
+</tr>
+<tr>
+<td><code>b(x: Int, y: Int)</code></td>
+<td><code>b(arg0 = 1, arg1 = 2)</code></td>
+<td><code>12</code></td>
+<td>E0043</td>
+<td><code>b(x = 1, y = 2)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> メッセージなしで別の多重定義が実行されます。
+  または <strong>E0006</strong>（<code>method call is applicable for both …</code>）か、
+  <strong>E0043</strong>（<code>不明なパラメータ名: arg0</code>）が表示されます。</li>
+<li><strong>今までどおり動くもの:</strong> 呼び出し先より下にある名前付きの呼び出しと、位置引数だけの呼び出しです。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 黙って結果が変わる呼び出しは、以前の方法で解決しないと見つかりません。
+  また、どの多重定義のつもりかは書いた人にしか分かりません。表に各書き換えを示します。</li>
 </ul>
 
 

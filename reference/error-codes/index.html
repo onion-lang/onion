@@ -9064,7 +9064,7 @@ pass reports it yet -- it can never actually appear in a build log.</p>
 </tr>
 <tr>
 <td><code>W0016</code></td>
-<td><code>@TailRecursive</code> annotation present but its mutual-recursion group could not be optimized</td>
+<td><code>@TailRecursive</code> annotation present but the method or its mutual-recursion group could not be optimized</td>
 </tr>
 <tr>
 <td><code>W0017</code></td>
@@ -9117,6 +9117,10 @@ pass reports it yet -- it can never actually appear in a build log.</p>
 <tr>
 <td><code>W0029</code></td>
 <td>a method without <code>override</code> overrides an inherited method that differs from it only by <code>?</code> (<code>dec(k: Int?)</code> beside <code>Base.dec(k: Int)</code>), so a call through the base type runs it. Add <code>override</code>, or rename it to keep a separate method</td>
+</tr>
+<tr>
+<td><code>W0030</code></td>
+<td>a method without <code>override</code> looks like an override of an inherited method that differs from it only by <code>?</code>, but is an overload (<code>dec(k: Int)</code> beside <code>Base.dec(k: Int?)</code>), so a call through the base type runs the base method. Make the parameter nullable (<code>Int?</code>) to override, or rename it to keep a separate method</td>
 </tr>
 </tbody>
 </table>

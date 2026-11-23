@@ -5767,7 +5767,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 <tr>
 <td><code>W0016</code></td>
 <td><code>ineffective-tail-recursive</code></td>
-<td><code>@TailRecursive</code> annotation present but its mutual-recursion group could not be optimized</td>
+<td><code>@TailRecursive</code> annotation present but the method or its mutual-recursion group could not be optimized</td>
 </tr>
 <tr>
 <td><code>W0017</code></td>
@@ -5828,6 +5828,11 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 <td><code>W0029</code></td>
 <td><code>unmarked-nullable-override</code></td>
 <td>A method without <code>override</code> overrides an inherited one that differs from it only by <code>?</code></td>
+</tr>
+<tr>
+<td><code>W0030</code></td>
+<td><code>unmarked-nullable-overload</code></td>
+<td>A method without <code>override</code> looks like an override of an inherited one that differs only by <code>?</code>, but is an overload</td>
 </tr>
 <tr>
 <td><code>W0027</code></td>

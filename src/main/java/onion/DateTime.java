@@ -97,7 +97,15 @@ public final class DateTime {
             if (t instanceof java.time.OffsetDateTime o) return o.toInstant().toEpochMilli();
             if (t instanceof LocalDateTime l) return l.atZone(LOCAL).toInstant().toEpochMilli();
             // Date only: midnight at the offset or zone written in the text, else local.
-            java.time.ZoneId zone = formatter.parse(dateTime).query(java.time.temporal.TemporalQueries.zone());
+            java.time.temporal.TemporalAccessor parsed = formatter.parse(dateTime);
+            // A time field that never became a time (`hh` or `K` with no `a`) must not be dropped.
+            for (java.time.temporal.ChronoField f : new java.time.temporal.ChronoField[] {
+                    java.time.temporal.ChronoField.CLOCK_HOUR_OF_AMPM, java.time.temporal.ChronoField.HOUR_OF_AMPM,
+                    java.time.temporal.ChronoField.MINUTE_OF_HOUR, java.time.temporal.ChronoField.SECOND_OF_MINUTE})
+                if (parsed.isSupported(f))
+                    throw new IllegalArgumentException("cannot parse \"" + dateTime + "\" with pattern \"" + pattern
+                        + "\": the time is not complete (a 12-hour field `hh`/`h`/`K` needs an am/pm field `a`)");
+            java.time.ZoneId zone = parsed.query(java.time.temporal.TemporalQueries.zone());
             return ((LocalDate) t).atStartOfDay(zone != null ? zone : LOCAL).toInstant().toEpochMilli();
         } catch (java.time.format.DateTimeParseException d) {
             throw new IllegalArgumentException(

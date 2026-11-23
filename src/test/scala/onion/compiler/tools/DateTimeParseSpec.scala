@@ -51,6 +51,22 @@ class DateTimeParseSpec extends AbstractShellSpec {
           |}""".stripMargin, "None", Array())
       assert(r.isInstanceOf[Shell.Success] && r.asInstanceOf[Shell.Success].value.toString.contains("expected 2026-11-11"))
     }
+    it("rejects a clock-hour pattern without an am/pm field instead of returning midnight (#3145)") {
+      val r = shell.run(
+        """def main(args: String[]): String {
+          |  try { DateTime::parse("2026-11-11T09:30Z", "yyyy-MM-dd'T'hh:mmXXX"); return "no-throw" }
+          |  catch e: Exception { return e.getMessage() }
+          |}""".stripMargin, "None", Array())
+      assert(r.isInstanceOf[Shell.Success] && r.asInstanceOf[Shell.Success].value.toString.contains("am/pm"))
+    }
+    it("parses a clock-hour pattern that has an am/pm field (#3145)") {
+      val r = shell.run(
+        """def main(args: String[]): String {
+          |  val a = DateTime::parse("2026-11-11T09:30 PM Z", "yyyy-MM-dd'T'hh:mm a X")
+          |  return (a == DateTime::parse("2026-11-11T21:30:00Z")) + ""
+          |}""".stripMargin, "None", Array())
+      assert(Shell.Success("true") == r)
+    }
     it("honours an offset in a date-only patterned parse (#3059)") {
       val r = shell.run(
         """def main(args: String[]): String {

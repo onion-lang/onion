@@ -81,6 +81,27 @@ class ArgsSpec extends AbstractShellSpec {
       assert(Shell.Success("invalid value for --count: 'abc' (expected Int)") == result)
     }
 
+    it("rejects a bare --name with no value instead of using the default (#3081)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    try {
+          |      return "" + o.intOption("count", 3)
+          |    } catch e: IllegalArgumentException {
+          |      return e.getMessage()
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsBareInt.on",
+        Array("--count")
+      )
+      assert(Shell.Success("missing value for --count (expected Int)") == result)
+    }
+
     it("still uses the default when the option is absent (#2881)") {
       val result = shell.run(
         """

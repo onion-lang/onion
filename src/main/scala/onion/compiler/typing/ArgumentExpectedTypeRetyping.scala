@@ -72,11 +72,51 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     }
     if (malleableIndices.isEmpty) return None
 
-    val candidate = uniqueCandidate(sourceType, name, params.length, filter) match {
-      case Some(c) => c
-      case None => return None
+    uniqueCandidate(sourceType, name, params.length, filter) match {
+      case Some(c) => retypeAgainst(c, sourceType, args, params, context, receiverType, malleableIndices)
+      case None => None
     }
+  }
 
+  /**
+   * Overloads (`f(xs: List[T])` / `f(o: Object)`): as Java infers a generic factory's type
+   * argument from the slot, try each candidate's slots and keep the first whose retyped arguments
+   * resolve to that very candidate, per `resolves` (#2841). Only a collection-literal or generic
+   * call argument is retyped, so a branching argument is left to [[retypeArguments]].
+   */
+  def retypeArgumentsForOverloads(
+    sourceType: ObjectType,
+    name: String,
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    context: LocalContext,
+    filter: Method => Boolean,
+    receiverType: Type,
+    resolves: (Array[Term], Method) => Boolean
+  ): Option[Array[Term]] = {
+    if (params == null || params.isEmpty) return None
+    val malleableIndices = args.zipWithIndex.collect {
+      case (expr, i) if i < params.length && isMalleable(expr) => i
+    }
+    if (malleableIndices.isEmpty) return None
+    val set = new JTreeSet[Method](new MethodComparator)
+    calls.collectMethodsMatching(sourceType, name, set, filter)
+    val candidates = set.asScala.filter(acceptsArity(_, params.length)).toList
+    if (candidates.length < 2) return None
+    candidates.iterator.map { c =>
+      retypeAgainst(c, sourceType, args, params, context, receiverType, malleableIndices).filter(resolves(_, c))
+    }.collectFirst { case Some(updated) => updated }
+  }
+
+  private def retypeAgainst(
+    candidate: Method,
+    sourceType: ObjectType,
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    context: LocalContext,
+    receiverType: Type,
+    malleableIndices: Seq[Int]
+  ): Option[Array[Term]] = {
     val classSubst =
       if (receiverType != null) TypeSubstitution.classSubstitution(receiverType)
       else TypeSubstitution.classSubstitution(sourceType)

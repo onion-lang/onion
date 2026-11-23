@@ -129,6 +129,14 @@ private[compiler] final class InstanceMethodCallSupport(
             if (remethods.length > 0) (newParams, remethods) else (params0, methods0)
           case None => (params0, methods0)
         }
+      else if (methods0.length == 1 && calls.hasMalleableArgs(node.args))
+        // `f(List[T])` / `f(Object)` with `Collections::emptyList()`: the factory's element type is
+        // unpinned, so only `f(Object)` applies. Java pins it from the slot and takes `f(List)` (#2841).
+        calls.retypeArgumentsForOverloads(targetType, name, node.args, params0, context, calls.isInstanceMethod, target.`type`,
+          (ps, c) => { val r = MethodResolution.findMethods(targetType, name, ps, bodyContext.table); r.length == 1 && (r(0) eq c) && (c ne methods0(0)) }) match {
+          case Some(newParams) => (newParams, MethodResolution.findMethods(targetType, name, newParams, bodyContext.table))
+          case None => (params0, methods0)
+        }
       else (params0, methods0)
 
     if (methods.length == 0) {

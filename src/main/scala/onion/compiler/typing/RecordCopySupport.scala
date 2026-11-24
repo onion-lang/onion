@@ -156,7 +156,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
       targetType.findMethod("copy", orderedParams) match {
         case Array(method, _*) if declaresCopy && !takesComponentsInOrder(method) => None
         case Array(method, _*) =>
-          calls.buildResolvedCall(node, method, orderedParams, typeArgs, classSubst, null)(
+          calls.buildResolvedCall(node, method, orderedParams, typeArgs, classSubst, null, context)(
             expectedArgs => calls.processParamsWithExpected(node, orderedParams, expectedArgs),
             finalParams => buildRawCall(method, finalParams)
           ) match {

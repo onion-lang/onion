@@ -31,7 +31,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
     typeArgs: List[AST.TypeNode],
     classSubst: scala.collection.immutable.Map[String, Type],
     expected: Type,
-    context: LocalContext = null
+    context: LocalContext
   )(
     prepareParams: Array[Type] => Option[Array[Term]],
     buildRawCall: Array[Term] => Term

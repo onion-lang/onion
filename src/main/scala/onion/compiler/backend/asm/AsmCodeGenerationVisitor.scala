@@ -725,7 +725,8 @@ class AsmCodeGenerationVisitor(
   override def visitRefField(node: RefField): Unit =
     visitTerm(node.target)
     val ownerType = AsmUtil.objectType(node.field.affiliation.name)
-    gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
+    if !emitFieldAccessor(node.field, node.field.affiliation.name, write = false, Some(node.target.`type`)) then
+      gen.getField(ownerType, node.field.name, asmType(node.field.`type`))
   
   override def visitSetField(node: SetField): Unit =
     val valueType = asmType(node.`type`)
@@ -747,7 +748,8 @@ class AsmCodeGenerationVisitor(
       gen.storeLocal(valueSlot)
       gen.loadLocal(targetSlot)
       gen.loadLocal(valueSlot)
-      gen.putField(ownerType, node.field.name, valueType)
+      if !emitFieldAccessor(node.field, node.field.affiliation.name, write = true, Some(node.target.`type`)) then
+        gen.putField(ownerType, node.field.name, valueType)
       // Assignment is itself an expression; leave the assigned value as its result.
       gen.loadLocal(valueSlot)
     else
@@ -759,7 +761,8 @@ class AsmCodeGenerationVisitor(
         gen.dup2X1()
       else
         gen.dupX1()
-      gen.putField(ownerType, node.field.name, valueType)
+      if !emitFieldAccessor(node.field, node.field.affiliation.name, write = true, Some(node.target.`type`)) then
+        gen.putField(ownerType, node.field.name, valueType)
   
   override def visitNewObject(node: NewObject): Unit =
     val classType = AsmUtil.objectType(node.constructor.affiliation.name)
@@ -859,9 +862,26 @@ class AsmCodeGenerationVisitor(
         gen.arrayStore(componentType)
       }
 
+  /** The host's accessor for a protected field of a foreign-package superclass, when this
+   *  code runs in a closure: the closure class is not a subclass, so the JVM refuses a direct
+   *  access (#3218, the field sibling of #2910). Emits the call and returns true, or emits
+   *  nothing and returns false. The operands (instance, value) are already on the stack. */
+  private def emitFieldAccessor(field: FieldRef, owner: String, write: Boolean, target: Option[TypedAST.Type]): Boolean =
+    val accessor =
+      if localVars.isInstanceOf[ClosureLocalVarContext] then asmCodeGen.protectedFieldAccessorFor(field, owner, write, target)
+      else None
+    accessor match
+      case Some(name) =>
+        gen.invokeStatic(AsmUtil.objectType(asmCodeGen.currentHostName),
+          new AsmMethod(name, asmCodeGen.protectedFieldAccessorDescriptor(field, write)))
+        true
+      case None => false
+
   override def visitRefStaticField(node: RefStaticField): Unit =
     val ownerType = AsmUtil.objectType(node.target.name)
-    gen.getStatic(ownerType, node.field.name, asmType(node.field.`type`))
+    val fieldType = asmType(node.field.`type`)
+    if !emitFieldAccessor(node.field, node.target.name, write = false, None) then
+      gen.getStatic(ownerType, node.field.name, fieldType)
   
   override def visitSetStaticField(node: SetStaticField): Unit =
     val fieldType = asmType(node.field.`type`)
@@ -869,7 +889,8 @@ class AsmCodeGenerationVisitor(
     asmCodeGen.adaptValueOnStack(gen, node.value.`type`, fieldType)
     if fieldType.getSize() == 2 then gen.dup2() else gen.dup()
     val ownerType = AsmUtil.objectType(node.target.name)
-    gen.putStatic(ownerType, node.field.name, fieldType)
+    if !emitFieldAccessor(node.field, node.target.name, write = true, None) then
+      gen.putStatic(ownerType, node.field.name, fieldType)
   
   override def visitOuterThis(node: OuterThis): Unit =
     gen.loadThis()

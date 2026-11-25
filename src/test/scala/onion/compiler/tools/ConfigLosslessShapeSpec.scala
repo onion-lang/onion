@@ -297,19 +297,19 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
     }
   }
 
-  describe("comments are whole lines, not a trailing syntax") {
-    it("reads a '#' after a value on the same line as part of the value, not a stripped comment") {
+  describe("a trailing comment needs whitespace before the #") {
+    it("reads a '#' glued to a value as part of the value (a trailing comment is #3165)") {
       val r = shell.run(decl +
         """class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val text = "host = example.com  # primary\nport = 1\ndebug = true\n"
+          |    val text = "host = example.com#primary\nport = 1\ndebug = true\n"
           |    val got = Server::cfg().parse(text).get()
           |    return got.host()
           |  }
           |}
           |""".stripMargin, "None", Array())
-      assert(Shell.Success("example.com  # primary") == r, r.toString)
+      assert(Shell.Success("example.com#primary") == r, r.toString)
     }
   }
 
@@ -503,6 +503,36 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "None", Array())
       assert(Shell.Success("rejected") == r, r.toString)
+    }
+  }
+
+  describe("a trailing # comment (#3165)") {
+    def run(body: String) = shell.run(decl +
+      "class Test {\npublic:\n  static def main(args: String[]): String {\n" + body + "\n  }\n}\n",
+      "None", Array())
+
+    it("is not part of a String, Int or Boolean value") {
+      val r = run(
+        "    val s = Server::cfg().parse(\"host = db   # primary\\nport = 5432  # p\\ndebug = false # d\\n\").get()\n" +
+        "    return s.host() + \"|\" + s.port() + \"|\" + s.debug()")
+      assert(Shell.Success("db|5432|false") == r, r.toString)
+    }
+
+    it("leaves a glued # and a quoted ' #' as value text, and print quotes ' #'") {
+      val r = run(
+        "    val a = Server::cfg().parse(\"host = a#b\\nport = 1\\ndebug = true\\n\").get().host()\n" +
+        "    val b = Server::cfg().parse(\"host = \\\"a #b\\\" # c\\nport = 1\\ndebug = true\\n\").get().host()\n" +
+        "    val v = new Server(\"x #y\", 1, true)\n" +
+        "    val c = Server::cfg().parse(Server::cfg().print(v)).get().host()\n" +
+        "    return a + \"|\" + b + \"|\" + c")
+      assert(Shell.Success("a#b|a #b|x #y") == r, r.toString)
+    }
+
+    it("survives an edit of its own line") {
+      val r = run(
+        "    val l = Server::cfg().parseLossless(\"host = h\\nport = 5432  # default\\ndebug = false\\n\").get()\n" +
+        "    return Server::cfg().printLossless(l.value().copy(port = 80), l.residue())")
+      assert(Shell.Success("host = h\nport = 80  # default\ndebug = false\n") == r, r.toString)
     }
   }
 }

@@ -3007,8 +3007,8 @@ AST.Expression dot_suffix(AST.Expression e) : {
   List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL(); AST.ClosureExpression tl = null;
 }{
   t="." eols() n=id() (
-      LOOKAHEAD( type_arguments() eols() "(" )
-        tas=type_arguments() eols() "(" eols() args=terms() ")"
+      LOOKAHEAD( type_arguments() ( eols() "(" | type_args_lambda_ahead() ) )
+        tas=type_arguments() [ LOOKAHEAD( eols() "(" ) eols() "(" eols() args=terms() ")" ]
         tl=trailing_lambda_opt()
           { args = AST.appendToList(args, tl); tl = null; e = new AST.MethodCall(through(n), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
@@ -3032,8 +3032,8 @@ AST.Expression safe_access_suffix(AST.Expression e) : {
   List<AST.TypeNode> tas = (List<AST.TypeNode>)AST.NIL(); AST.ClosureExpression tl = null;
 }{
   t=<SAFE_ACCESS> eols() n=id() (
-      LOOKAHEAD( type_arguments() eols() "(" )
-        tas=type_arguments() eols() "(" eols() args=terms() ")"
+      LOOKAHEAD( type_arguments() ( eols() "(" | type_args_lambda_ahead() ) )
+        tas=type_arguments() [ LOOKAHEAD( eols() "(" ) eols() "(" eols() args=terms() ")" ]
         tl=trailing_lambda_opt()
           { args = AST.appendToList(args, tl); tl = null; e = new AST.SafeMethodCall(p(t), e, c(n), args, tas); }
     | LOOKAHEAD(1) "(" eols() args=terms() ")"
@@ -3064,7 +3064,7 @@ AST.Expression static_access_primary() : {
   LOOKAHEAD( class_type() type_arguments() "::" ) ty=class_type() tas=type_arguments() t="::" n=id() "(" es=terms() ")"
     tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); needsBodyRewrite = true; return new AST.TraitMethodCall(through(n), ty, tas, c(n), es); }
-| LOOKAHEAD( boxed_class_type() "::" id() type_arguments() "(" ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
+| LOOKAHEAD( boxed_class_type() "::" id() type_arguments() ( "(" | type_args_lambda_ahead() ) ) ty=boxed_class_type() t="::" n=id() tas=type_arguments() [ LOOKAHEAD(1) "(" es=terms() ")" ]
     tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( boxed_class_type() "::" id() "(" ) ty=boxed_class_type() t="::" n=id() "(" es=terms() ")"
@@ -3073,7 +3073,7 @@ AST.Expression static_access_primary() : {
 | LOOKAHEAD( boxed_class_type() "::" ) ty=boxed_class_type() t="::" n=id()
     tl=trailing_lambda_opt()
     { return staticMemberOrCall(t, n, ty, tl); }
-| LOOKAHEAD( dotted_class_type() "::" id() type_arguments() "(" ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() "(" es=terms() ")"
+| LOOKAHEAD( dotted_class_type() "::" id() type_arguments() ( "(" | type_args_lambda_ahead() ) ) ty=dotted_class_type() t="::" n=id() tas=type_arguments() [ LOOKAHEAD(1) "(" es=terms() ")" ]
     tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD( dotted_class_type() "::" id() "(" ) ty=dotted_class_type() t="::" n=id() "(" es=terms() ")"
@@ -3082,7 +3082,7 @@ AST.Expression static_access_primary() : {
 | LOOKAHEAD( dotted_class_type() "::" ) ty=dotted_class_type() t="::" n=id()
     tl=trailing_lambda_opt()
     { return staticMemberOrCall(t, n, ty, tl); }
-| LOOKAHEAD( class_type() "::" id() type_arguments() "(" ) ty=class_type() t="::" n=id() tas=type_arguments() "(" es=terms()  ")"
+| LOOKAHEAD( class_type() "::" id() type_arguments() ( "(" | type_args_lambda_ahead() ) ) ty=class_type() t="::" n=id() tas=type_arguments() [ LOOKAHEAD(1) "(" es=terms() ")" ]
     tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.StaticMethodCall(through(n), ty, c(n), es, tas); }
 | LOOKAHEAD(4) ty=class_type() t="::" n=id() "(" es=terms()  ")"
@@ -3108,8 +3108,8 @@ AST.Expression primary() : {
   AST.BlockExpression body;
   AST.ClosureExpression tl = null;
 }{
-  LOOKAHEAD( "super" eols() "." eols() id() type_arguments() "(" )
-    t="super" eols() "." eols() n=id() tas=type_arguments() "(" es=terms() ")"
+  LOOKAHEAD( "super" eols() "." eols() id() type_arguments() ( "(" | type_args_lambda_ahead() ) )
+    t="super" eols() "." eols() n=id() tas=type_arguments() [ LOOKAHEAD(1) "(" es=terms() ")" ]
     tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.SuperMethodCall(p(t), c(n), es, tas); }
 | t="super" eols() "." eols() n=id() [LOOKAHEAD(2) "(" es=terms() ")"]
@@ -3133,7 +3133,7 @@ AST.Expression primary_rest() : {
   AST.BlockExpression body;
   AST.ClosureExpression tl = null;
 }{
-  LOOKAHEAD( id() type_arguments() "(" ) t=id() tas=type_arguments() "(" es=terms() ")"
+  LOOKAHEAD( id() type_arguments() ( "(" | type_args_lambda_ahead() ) ) t=id() tas=type_arguments() [ LOOKAHEAD(1) "(" es=terms() ")" ]
     tl=trailing_lambda_opt()
     { es = AST.appendToList(es, tl); return new AST.UnqualifiedMethodCall(through(t), c(t), es, tas); }
 | LOOKAHEAD(2) t=id() "(" es=terms() ")"
@@ -3348,6 +3348,15 @@ AST.ClosureExpression trailing_lambda_opt() :{ AST.ClosureExpression tl = null; 
   [ LOOKAHEAD(trailing_lambda_head()) tl=trailing_lambda() ]
   [ LOOKAHEAD({ tl == null && bareTrailingBlockAhead() }) tl=trailing_lambda() ]
   { return tl; }
+}
+
+// Look-ahead, after explicit type arguments, for a call written with only a trailing lambda:
+// `C::m[T] { a -> ... }` anywhere, `C::m[T] { body }` outside a condition (#3200). The
+// arrow-less test reads only the condition state, not a token: in a syntactic scan
+// getToken(1) would peek at the wrong place.
+void type_args_lambda_ahead() :{}{
+  LOOKAHEAD( trailing_lambda_head() ) trailing_lambda_head()
+| LOOKAHEAD({ !inCondition() }) "{"
 }
 
 // Look-ahead for trailing lambda: { [args] -> ... }

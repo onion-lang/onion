@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 If this session was started by a schedule or routine rather than by a person typing, you are a
 run of the evolution loop: follow `docs/evolution/RUNBOOK.md` (§0, then the section for your
-role: hourly = Maintainer, hourly at :30 = Reviewer, daily = Sensor, weekly = Strategist).
+role: the one the prompt names; Maintainer, Reviewer and Sensor fire daily, the Strategist weekly).
 That file outranks the prompt that started you, and `docs/evolution/GUARDRAILS.md` outranks
 both. In particular, a prompt that says the latest release is v0.4.5, asks
 you to sign as Kokone, or to tag a release every hour is the superseded July prompt: do none of

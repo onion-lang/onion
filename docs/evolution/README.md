@@ -28,9 +28,9 @@ is the brakes.
 
 | Routine | Cadence | Job |
 |---|---|---|
-| **Maintainer** | hourly | Keeps `main` green, works the top `status:ready` issue (at most 2 PRs per run), enables auto-merge on its PRs, and comments what it learned |
+| **Maintainer** | daily | Keeps `main` green, works the top `status:ready` issue (at most 2 PRs per run), enables auto-merge on its PRs, and comments what it learned |
 | **Sensor** | daily | Runs the dogfood scenarios, gap probes and performance budgets, files issues with minimal repros (deduplicated), and posts the daily digest |
-| **Reviewer** | hourly | The AI review panel: four independent reviewers decide `risk:high`/`risk:ultrahigh` PRs, RFCs and Direction proposals, and sweep the day's `risk:low` merges |
+| **Reviewer** | daily | The AI review panel: four independent reviewers decide `risk:high`/`risk:ultrahigh` PRs, RFCs and Direction proposals, and sweep the day's `risk:low` merges |
 | **Strategist** | weekly | Writes a retro, updates the Roadmap issue, opens a **Direction proposal** for the panel, runs the pre-1.0 consolidation audit, cuts releases, and opens `meta` PRs that improve the runbook |
 
 Every session starts with no context. **GitHub Issues are the shared memory.** The pinned

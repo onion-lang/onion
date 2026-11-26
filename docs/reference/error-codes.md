@@ -1161,7 +1161,8 @@ public:
 Fix: use the plain value in a `requires`, or move the condition to an `ensures`.
 
 Inside a lambda, `old(...)` is E0107 even in an `ensures` or a `history`: the method keeps the
-value on entry, and a lambda runs on its own. Pass the value in as an argument instead:
+value on entry lives in its own frame, which a lambda cannot read (`result` and the
+parameters can be captured; `old(...)` cannot). Pass the value in as an argument instead:
 
 ```onion
 def f(): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + 1 }

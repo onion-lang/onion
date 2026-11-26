@@ -1307,7 +1307,7 @@ class SemanticErrorReporter(threshold: Int) {
         val argText = if (items.length > 1) asString(items(1)) else "..."
         val argType = if (items.length > 2 && items(2) != null) typeName(items(2)) else null
         val hint =
-          if (argText == "..." || argType == null) message("suggestion.oldInLambda.example")
+          if (argText.contains("...") || argType == null) message("suggestion.oldInLambda.example")
           else format(message("suggestion.oldInLambda"), Seq(argText, argType))
         problem(position, appendSuggestion(message("error.semantic.oldInLambda"), Some(hint)))
       // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.

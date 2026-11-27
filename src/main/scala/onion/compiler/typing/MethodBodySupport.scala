@@ -69,10 +69,31 @@ private[compiler] final class MethodBodySupport(
     reportUnused(context)
   }
 
-  /** The `history` clauses of the classes `definition` extends, nearest first (#2731). */
+  /** The `history` clauses of the classes `definition` extends, nearest first, each with its term
+   *  as typed in the class that declares it (#2731). A generic superclass is reached through its
+   *  applied type (`extends Base[String]`), so the walk unwraps it to the definition. */
+  private def inheritedHistories(definition: ClassDefinition): List[(AST.Expression, Term)] = {
+    def declared(t: ClassType): ClassDefinition = t match {
+      case d: ClassDefinition => d
+      case a: AppliedClassType => declared(a.raw)
+      case _ => null
+    }
+    Iterator.iterate(declared(definition.superClass))(d => declared(d.superClass))
+      .takeWhile(_ != null).flatMap(d => d.historySources.zip(d.histories)).toList
+  }
+
   private def inheritedHistorySources(definition: ClassDefinition): List[AST.Expression] =
-    Iterator.iterate(definition.superClass)(_ match { case d: ClassDefinition => d.superClass; case _ => null })
-      .takeWhile(_ != null).collect { case d: ClassDefinition => d.historySources }.flatten.toList
+    inheritedHistories(definition).map(_._1)
+
+  /** The fields a clause's term reads, by declaring class and name. */
+  private def fieldsRead(term: Term): Set[(String, String)] = {
+    val named = Set.newBuilder[(String, String)]
+    TermWalk.exists(term, intoClosures = true) {
+      case r: RefField if r.field.affiliation != null => named += ((r.field.affiliation.name, r.field.name)); false
+      case _ => false
+    }
+    named.result()
+  }
 
   /** W0026: a clause that `--contracts runtime` does not enforce. Never silent. */
   private def warnNotGuarded(method: MethodDefinition, at: AST.Node, why: String): Unit =
@@ -141,12 +162,15 @@ private[compiler] final class MethodBodySupport(
     val historyTerms = if (isStatic) Nil else
       gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(definition.historySources, gctx, ContractScope.History))
     // A superclass's `history` binds its subclasses too (#2731). It was written against the
-    // superclass, so one that cannot be read from here (a private field) is left out, silently:
-    // a subclass method cannot write what it cannot name.
-    val inheritedTerms: Seq[ActionStatement] = if (isStatic) Nil else inheritedHistorySources(definition).flatMap { s =>
+    // superclass, so it is typed again here and kept only when it reads the same fields there.
+    // It is left out when it cannot be read from here (a private field: a subclass method cannot
+    // write what it cannot name), or when a field of this class shadows one it reads (its names
+    // then mean this class's field, which the clause is not about).
+    val inheritedTerms: Seq[ActionStatement] = if (isStatic) Nil else inheritedHistories(definition).flatMap { case (s, declaredTerm) =>
       val start = bodyContext.problemCount
       val terms = gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(List(s), gctx, ContractScope.History))
       if (bodyContext.problemCount != start) { bodyContext.dropProblemsSince(start); Nil }
+      else if (terms.exists(t => fieldsRead(t) != fieldsRead(declaredTerm))) Nil
       else terms.map(t => guard(t, s, "history"))
     }
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++

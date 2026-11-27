@@ -16,6 +16,7 @@ object ExpressionText {
     case AST.StringLiteral(_, v)            => "\"" + v + "\""
     case AST.Not(_, t)                      => "!" + wrap(t)
     case AST.Negate(_, t)                   => "-" + wrap(t)
+    case AST.Indexing(_, l, r)              => wrap(l) + "[" + of(r) + "]"
     case b: AST.BinaryExpression            => wrap(b.lhs) + " " + b.symbol + " " + wrap(b.rhs)
     case AST.UnqualifiedMethodCall(_, n, args, _) => n + args.map(of).mkString("(", ", ", ")")
     case AST.MemberSelection(_, t, n)       => (if (t == null) "" else of(t) + ".") + n

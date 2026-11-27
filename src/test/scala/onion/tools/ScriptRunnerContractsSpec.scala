@@ -245,6 +245,123 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
 
+  // A superclass `history` binds its subclasses: a method of `Sub` that writes the inherited field is
+  // guarded like one of `Base` (#2731).
+  private def inherited(arg: String) =
+    s"""class Base {
+       |  history n >= old(n)
+       |protected:
+       |  var n: Int
+       |public:
+       |  def this { n = 10 }
+       |  def get(): Int = n
+       |}
+       |class Sub extends Base {
+       |public:
+       |  def this { }
+       |  def set(m: Int): void { n = m }
+       |}
+       |val s = new Sub()
+       |s.set(Integer::parseInt("$arg"))
+       |println(s.get())
+       |""".stripMargin
+
+  test("--contracts runtime: a subclass method that breaks an inherited history throws (#2731)"):
+    val path = writeScript(inherited("3"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("Sub.set() history failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts runtime: a subclass method that keeps an inherited history runs (#2731)"):
+    val path = writeScript(inherited("12"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("12")
+
+  // The superclass is generic, so `Sub` extends an applied type (#2731, panel block on #3290).
+  private def genericInherited(levels: Int, arg: String) =
+    val sub = if (levels == 2) "class Sub extends Base[String] {"
+      else "class Mid[U] extends Base[U] {\npublic:\n  def this { }\n}\nclass Sub extends Mid[String] {"
+    s"""class Base[T] {
+       |  history n >= old(n)
+       |protected:
+       |  var n: Int
+       |public:
+       |  def this { n = 10 }
+       |  def get(): Int = n
+       |}
+       |$sub
+       |public:
+       |  def this { }
+       |  def set(m: Int): void { n = m }
+       |}
+       |val s = new Sub()
+       |s.set(Integer::parseInt("$arg"))
+       |println(s.get())
+       |""".stripMargin
+
+  test("--contracts runtime: a subclass of a generic superclass is bound by its history (#2731)"):
+    val path = writeScript(genericInherited(2, "3"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("Sub.set() history failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts runtime: a generic link in a three-level chain keeps the history (#2731)"):
+    val path = writeScript(genericInherited(3, "3"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("Sub.set() history failed")), chain.map(_.getMessage).toString)
+    val ok = writeScript(genericInherited(3, "12"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", ok)))
+    code shouldBe 0
+    out should include("12")
+
+  // `Sub` declares its own `n`, which shadows `Base.n`: `Base`'s history is about `Base.n`, which
+  // `Sub.dec` does not write, so nothing is violated (#2731, panel block on #3290).
+  test("--contracts runtime: a subclass field that shadows a history's field is not guarded by it (#2731)"):
+    val path = writeScript(
+      """class Base {
+        |  history n >= old(n)
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def get(): Int = n
+        |}
+        |class Sub extends Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 100 }
+        |  def dec(): void { n = Integer::parseInt("50") }
+        |  def sub(): Int = n
+        |}
+        |val s = new Sub()
+        |s.dec()
+        |println("sub=" + s.sub() + " base=" + s.get())
+        |""".stripMargin)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("sub=50 base=10")
+
+  // A history over a private field of `Base` cannot be written by `Sub`, so `Sub` runs unguarded.
+  test("--contracts runtime: an inherited history over a private field does not reach the subclass (#2731)"):
+    val path = writeScript(
+      """class Base {
+        |  history n >= old(n)
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def get(): Int = n
+        |}
+        |class Sub extends Base {
+        |public:
+        |  def this { }
+        |  def twice(): Int = get() * 2
+        |}
+        |println("twice=" + new Sub().twice())
+        |""".stripMargin)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("twice=20")
+
   test("--contracts runtime: a setter whose parameter shares the field's name keeps a history that holds"):
     val path = writeScript(setter("12"))
     val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))

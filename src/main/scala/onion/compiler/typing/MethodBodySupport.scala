@@ -47,7 +47,7 @@ private[compiler] final class MethodBodySupport(
       bodyContext.warningReporter.report(WarningCategory.ContractTrusted, block.location,
         s"the contract of '${method.name}' is trusted, not verified: its body is not checked, and callers rely on it")
     val definition = method.classType match { case d: ClassDefinition => Some(d); case _ => None }
-    val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty)
+    val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty || inheritedHistorySources(d).nonEmpty)
     // A public instance method of a class with an `invariant` or a `history` is a place where it must
     // hold, so it is guarded too (RFC #2557, design 7.4). A constructor is not a method here.
     val isStatic = (method.modifier & AST.M_STATIC) != 0
@@ -67,6 +67,32 @@ private[compiler] final class MethodBodySupport(
       method.setFrame(context.getContextFrame)
     }
     reportUnused(context)
+  }
+
+  /** The `history` clauses of the classes `definition` extends, nearest first, each with its term
+   *  as typed in the class that declares it (#2731). A generic superclass is reached through its
+   *  applied type (`extends Base[String]`), so the walk unwraps it to the definition. */
+  private def inheritedHistories(definition: ClassDefinition): List[(AST.Expression, Term)] = {
+    def declared(t: ClassType): ClassDefinition = t match {
+      case d: ClassDefinition => d
+      case a: AppliedClassType => declared(a.raw)
+      case _ => null
+    }
+    Iterator.iterate(declared(definition.superClass))(d => declared(d.superClass))
+      .takeWhile(_ != null).flatMap(d => d.historySources.zip(d.histories)).toList
+  }
+
+  private def inheritedHistorySources(definition: ClassDefinition): List[AST.Expression] =
+    inheritedHistories(definition).map(_._1)
+
+  /** The fields a clause's term reads, by declaring class and name. */
+  private def fieldsRead(term: Term): Set[(String, String)] = {
+    val named = Set.newBuilder[(String, String)]
+    TermWalk.exists(term, intoClosures = true) {
+      case r: RefField if r.field.affiliation != null => named += ((r.field.affiliation.name, r.field.name)); false
+      case _ => false
+    }
+    named.result()
   }
 
   /** W0026: a clause that `--contracts runtime` does not enforce. Never silent. */
@@ -135,6 +161,18 @@ private[compiler] final class MethodBodySupport(
     // Its names are the object's fields, so a parameter with a field's name is hidden from it (#2633).
     val historyTerms = if (isStatic) Nil else
       gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(definition.historySources, gctx, ContractScope.History))
+    // A superclass's `history` binds its subclasses too (#2731). It was written against the
+    // superclass, so it is typed again here and kept only when it reads the same fields there.
+    // It is left out when it cannot be read from here (a private field: a subclass method cannot
+    // write what it cannot name), or when a field of this class shadows one it reads (its names
+    // then mean this class's field, which the clause is not about).
+    val inheritedTerms: Seq[ActionStatement] = if (isStatic) Nil else inheritedHistories(definition).flatMap { case (s, declaredTerm) =>
+      val start = bodyContext.problemCount
+      val terms = gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(List(s), gctx, ContractScope.History))
+      if (bodyContext.problemCount != start) { bodyContext.dropProblemsSince(start); Nil }
+      else if (terms.exists(t => fieldsRead(t) != fieldsRead(declaredTerm))) Nil
+      else terms.map(t => guard(t, s, "history"))
+    }
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
     val ensuresGuards: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
@@ -146,7 +184,7 @@ private[compiler] final class MethodBodySupport(
         val g = guard(t, s, "history")
         definition.historyGuards((method.name, onion.compiler.contracts.ExpressionText.of(s))) = g.asInstanceOf[IfStatement]
         g
-      }
+      } ++ inheritedTerms
     // `old(e)` is e on entry: assigned after `requires` holds and before the body runs.
     val saved: Seq[ActionStatement] = saves.toSeq.map { case (slot, term) =>
       new ExpressionActionStatement(term.location, new SetLocal(0, slot, term.`type`, term))

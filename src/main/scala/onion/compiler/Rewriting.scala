@@ -973,11 +973,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // typing unrewritten inside a record method.
     val newSections = declaration.sections.map(rewriteAccessSection)
     val synthesisArgTypes = declaration.args.map(_.typeRef)
-    if (all.isEmpty) written.copy(sections = newSections)
+    // A component default is an expression like a parameter default: `do[M]` in it needs
+    // the same desugaring (#3224).
+    val newArgs = rewriteDefaults(written.args)
+    if (all.isEmpty) written.copy(args = newArgs, sections = newSections)
     // `shapes` is deliberately kept: typing validates each pattern (E0059) and its
     // capture-group count against the components (E0060), which the `from` synthesis gets
     // for free by routing through a regex select pattern and this one does not.
-    else written.copy(sections = newSections, synthesizedMethods = all,
+    else written.copy(args = newArgs, sections = newSections, synthesizedMethods = all,
       synthesisArgTypes = synthesisArgTypes)
   }
 

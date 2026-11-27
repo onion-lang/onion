@@ -1002,3 +1002,17 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     result.stdout should not include "compiles as written"
     result.stdout should include("1 file(s) need a manual change")
     result.exitCode shouldBe 1
+
+  test("duplicate errors do not hide the error cap, so an old file is not reported as compiling (#3214)"):
+    val root = Files.createTempDirectory("onion-migrate-cap-dup").toRealPath()
+    // Each script reports the same error twice (a lambda typed once per overload candidate);
+    // the reporter stores it once, so 600 of them reach the cap with fewer than 1000 stored.
+    (1 to 600).foreach(i => Files.writeString(root.resolve(f"a$i%04d.on"), "val a = [1].map { x -> nope }\n", UTF_8))
+    val old = root.resolve("zold.on")
+    Files.writeString(old, OldScript, UTF_8)
+
+    val result = invoke(root, root.toString)
+
+    result.stdout should not include "compiles as written"
+    result.stdout should include("1 file(s) need a manual change")
+    result.exitCode shouldBe 1

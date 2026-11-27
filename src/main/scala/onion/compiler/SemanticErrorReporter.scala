@@ -88,7 +88,6 @@ import onion.compiler.exceptions.CompilationException
 class SemanticErrorReporter(threshold: Int) {
   private val problems = Buffer[CompileError]()
   private var sourceFile: String = null
-  private var errorCount: Int = 0
   private var currentError: SemanticError = null
   private var context: CompilationContext = CompilationContext.empty
 
@@ -1228,7 +1227,6 @@ class SemanticErrorReporter(threshold: Int) {
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
     if (error == SemanticError.LAMBDA_ARITY_MISMATCH && position != null && !arityMismatchPositions.add((sourceFile, position))) return
-    errorCount += 1
     currentError = error
 
     error match {
@@ -1326,7 +1324,9 @@ class SemanticErrorReporter(threshold: Int) {
         }
     }
 
-    if (errorCount >= threshold) {
+    // The cap counts the errors kept, not the reports: a duplicate is stored once, so counting
+    // it would stop the compile below the cap and hide that it stopped (#3214).
+    if (problems.length >= threshold) {
       throw new CompilationException(problems.toSeq)
     }
   }

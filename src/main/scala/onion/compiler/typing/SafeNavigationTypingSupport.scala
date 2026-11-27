@@ -37,7 +37,7 @@ private[compiler] final class SafeNavigationTypingSupport(
       calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = false) match {
         case Some(r) => Some(buildResolved(r))
         case None =>
-          calls.tryZeroArgExtensionAccessForSafeNav(node, node.name, resolved.term, resolved.targetType, null).orElse {
+          calls.tryZeroArgExtensionAccessForSafeNav(node, node.name, resolved.term, resolved.targetType, context, null).orElse {
             calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = true)
               .map(buildResolved)
           }
@@ -150,7 +150,7 @@ private[compiler] final class SafeNavigationTypingSupport(
     val methods = MethodResolution.findMethods(targetType, name, params, bodyContext.table)
     if (methods.length == 0) {
       // No instance method found; fall back to extension methods before reporting an error
-      return calls.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
+      return calls.tryExtensionMethodCallForSafeNav(node, target, targetType, params, context, expected)
     }
 
     calls.selectSingleMethod(node, targetType, name, methods, calls.types(params)) match {

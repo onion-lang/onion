@@ -18,10 +18,11 @@ private[compiler] final class MethodCallFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type,
     reportIfNotFound: Boolean = true
   ): Option[Term] =
-    extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
+    extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, context, expected, reportIfNotFound)
 
   def hasErasureTwinExtension(targetType: ObjectType, name: String, target: Term = null): Boolean =
     extensionMethodFallbackSupport.hasErasureTwinExtension(targetType, name, target)
@@ -31,9 +32,10 @@ private[compiler] final class MethodCallFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type
   ): Option[Option[Term]] =
-    extensionMethodFallbackSupport.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
+    extensionMethodFallbackSupport.tryUserExtensionWithTypedArguments(node, target, targetType, params, context, expected)
 
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term], target: Term = null): Boolean =
     extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params, target)
@@ -44,18 +46,20 @@ private[compiler] final class MethodCallFallbackSupport(
     name: String,
     target: Term,
     targetType: ObjectType,
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
-    extensionMethodFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, expected)
+    extensionMethodFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, context, expected)
 
   def tryExtensionMethodCallForSafeNav(
     node: AST.SafeMethodCall,
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
-    extensionMethodFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
+    extensionMethodFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, context, expected)
 
   /** Safe-nav variant of `tryZeroArgExtensionAccess`: `expr?.name` resolves `def name: T` in an extension block. */
   def tryZeroArgExtensionAccessForSafeNav(
@@ -63,9 +67,10 @@ private[compiler] final class MethodCallFallbackSupport(
     name: String,
     target: Term,
     targetType: ObjectType,
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
-    extensionMethodFallbackSupport.tryZeroArgExtensionAccessForSafeNav(node, name, target, targetType, expected)
+    extensionMethodFallbackSupport.tryZeroArgExtensionAccessForSafeNav(node, name, target, targetType, context, expected)
 
   /** Extension-method resolution for the operator-overloading path (`a + b`). */
   def tryExtensionOperatorMethod(

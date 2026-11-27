@@ -796,7 +796,13 @@ class SemanticErrorReporter(threshold: Int) {
     val className = asString(items(2))
     val baseMessage = format(message("error.semantic.overrideTargetNotFound"), Seq(name, paramDescriptor, className))
 
-    val suggestion = if (items.length > 3) {
+    // A supertype method with the same name and arity: name its signature, since the
+    // user already wrote the right name and only the types differ (#2896).
+    val nearMisses = if (items.length > 4) items(4).asInstanceOf[Array[String]].toSeq else Seq.empty
+    val suggestion = if (nearMisses.nonEmpty) {
+      Some((message("error.suggestion.overrideBaseSignatures") +: nearMisses.map("    " + _) :+
+        ("  " + message("error.suggestion.overrideBaseSignaturesFix"))).mkString(Systems.lineSeparator))
+    } else if (items.length > 3) {
       val candidates = items(3).asInstanceOf[Array[String]]
       toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
     } else None
@@ -1014,10 +1020,11 @@ class SemanticErrorReporter(threshold: Int) {
     // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
     val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
     val primitiveTypeArgumentNull = items.length > 2 && items(2) == SemanticErrorReporter.PrimitiveTypeArgumentNullHint
+    val doBindErrorType = items.length > 2 && items(2) == SemanticErrorReporter.DoBindErrorTypeHint
     val baseMessage = format(
       // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
       // widening case (a set or range is never a List at runtime either).
-      message(if (listArrayCast.isDefined || widenToIterable || primitiveTypeArgumentNull || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      message(if (listArrayCast.isDefined || widenToIterable || primitiveTypeArgumentNull || doBindErrorType || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
       Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
@@ -1025,6 +1032,8 @@ class SemanticErrorReporter(threshold: Int) {
         Some(format(message("suggestion.contractClauseBoolean"), Seq(contractClause.get.keyword)))
       } else if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
+      } else if (doBindErrorType) {
+        Some(message("suggestion.doBindErrorType"))
       } else if (primitiveTypeArgumentNull) {
         Some(format(message("suggestion.primitiveTypeArgumentNull"), Seq(typeName(expected))))
       } else if (widenToIterable) {
@@ -1247,6 +1256,12 @@ class SemanticErrorReporter(threshold: Int) {
         reportUnknownParameterName(position, items)
       case SemanticError.OVERRIDE_TARGET_NOT_FOUND =>
         reportOverrideTargetNotFound(position, items)
+      case SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD if items.length > 4 =>
+        // The class has the method with a primitive where the contract has its boxed class,
+        // or the reverse: name both spellings (#2922).
+        val base = format(message("error.semantic.unimplementedAbstractMethod"), Seq(asString(items(0)), asString(items(1)), asString(items(2))))
+        problem(position, appendSuggestion(base,
+          Some(format(message("error.suggestion.boxedParameterNotBridged"), Seq(asString(items(3)), asString(items(4)))))))
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>
@@ -1286,6 +1301,15 @@ class SemanticErrorReporter(threshold: Int) {
         problem(position, format(
           message(if (clash.isStatic) "error.semantic.recordObjectMethodStatic" else "error.semantic.recordObjectMethodPrivate"),
           Seq(typeName(items(0)), asString(items(1)), args)))
+      // E0107 for `old(...)` in a lambda: the program ran before, so name the edit (#2732).
+      case SemanticError.CONTRACT_MISPLACED if items.nonEmpty && items(0) == "Lambda" =>
+        // items: "Lambda", the argument as source text ("..." when it cannot be shown), its type or null.
+        val argText = if (items.length > 1) asString(items(1)) else "..."
+        val argType = if (items.length > 2 && items(2) != null) typeName(items(2)) else null
+        val hint =
+          if (argText.contains("...") || argType == null) message("suggestion.oldInLambda.example")
+          else format(message("suggestion.oldInLambda"), Seq(argText, argType))
+        problem(position, appendSuggestion(message("error.semantic.oldInLambda"), Some(hint)))
       // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.
       case SemanticError.CONTRACT_FIELD_NOT_VALUE if items.length > 2 && items(2) == "write" =>
         problem(position, format(message("error.semantic.contractFieldWrittenOutside"), Seq(asString(items(0)), asString(items(1)))))
@@ -1427,6 +1451,10 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+
+  /** An extra (third) item on INCOMPATIBLE_TYPE: a `do[M]` bind returned another error type than
+    * the block's first bind, so the hint says to convert it with `.mapError` (#2670). */
+  private[compiler] case object DoBindErrorTypeHint
 
   /** An extra (third) item on INCOMPATIBLE_TYPE: `null` went into a slot typed by a class
    *  type variable whose type argument is a primitive (`xs.add(null)` on a `List[Int]`), so

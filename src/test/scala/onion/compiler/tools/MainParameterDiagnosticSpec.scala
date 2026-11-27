@@ -8,7 +8,7 @@ import java.io.StringReader
 
 /**
  * Regression test for issue #1998: a top-level `main` parameter whose type
- * auto-CLI cannot parse (e.g. `List[String]`, reached for by anyone wanting a
+ * auto-CLI cannot parse (e.g. a `Map[String, String]` or a `List[String]` option reached for by anyone wanting a
  * repeated `--tag a --tag b` option) used to be rejected with a message that
  * only talked about `String[]`, carried no error code, and pointed at the
  * `def` itself rather than the offending parameter. It must now name the
@@ -33,7 +33,7 @@ class MainParameterDiagnosticSpec extends AnyFunSpec {
     it("names the parameter, points at it, and carries E0094") {
       val result = compile(
         """
-          |def main(name: String, count: Int = 3, tags: List[String] = []): Int {
+          |def main(name: String, count: Int = 3, opts: Map[String, String] = [:]): Int {
           |  return 0
           |}
           |""".stripMargin
@@ -44,7 +44,7 @@ class MainParameterDiagnosticSpec extends AnyFunSpec {
 
       val expected = Message(
         "error.semantic.mainParameterNotCliConvertible",
-        Array[Any]("tags", "List[String]", onion.compiler.ScalarConversions.supportedNames)
+        Array[Any]("opts", "Map[String,String]", onion.compiler.ScalarConversions.supportedNames)
       )
       assert(
         errors.exists(_.message.contains(expected)),
@@ -52,7 +52,7 @@ class MainParameterDiagnosticSpec extends AnyFunSpec {
       )
 
       val badParam = errors.find(_.code.contains("E0094")).get
-      assert(badParam.location.line == 2, s"expected the error at the 'tags' parameter's line, got: ${badParam.location}")
+      assert(badParam.location.line == 2, s"expected the error at the 'opts' parameter's line, got: ${badParam.location}")
     }
   }
 

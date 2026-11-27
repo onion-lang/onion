@@ -79,8 +79,17 @@ private[compiler] final class DeclarationBodySupport(
       case v: AST.GlobalVariableDeclaration => v.name
     }.toSet
     def job(name: String, args: List[AST.Argument], declaration: => Option[AnyRef] = None)(body: => Unit): Option[DefaultScheduling.Job] =
-      if (!args.exists(_.defaultValue != null)) None
-      else {
+      if (!args.exists(_.defaultValue != null)) {
+        // Nothing to type, but a call anywhere above it, in any declaration or file, may still
+        // name its parameters, so the names are known before any body is typed (#3110).
+        declaration match {
+          case Some(m: MethodDefinition) if m.arguments.length == args.length =>
+            m.setArgumentsWithDefaults(
+              args.zipWithIndex.map { case (arg, i) => TypedAST.MethodArgument(arg.name, m.arguments(i), None) }.toArray)
+          case _ =>
+        }
+        None
+      } else {
         val mentions = mentionedNames(unit, args)
         // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
         // that reads one, in any kind of declaration, stays in source order, after it.

@@ -138,7 +138,7 @@ public:
 - **`this` は `Mid[U]` です:** `class Mid[U]` の中の `this` は `U` を保ちます。
   `val me = this`、`id(this)`、`[this]`、`() -> this` を通しても同じです。
   そのため `same(this)` は継承した `same(o: Box[T])` に渡せ、`me.get()` は `U` です（以前は raw な `Mid` で、`me.get()` は `Object` でした）。
-- **型引数が異なる分岐:** `if b { [t] } else { [u] }` は raw な `List` になります。
+- **型引数が異なる分岐:** `if b { [t] } else { [u] }` は `List[?]` になります (#3255)。
   `Object` が期待される場所ではコンパイルできます。`List[T]` が期待される場所では、`[u]` の分岐が `E0000` になります。
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 機械的にできる書き換えは `(u as T)` の挿入だけです。
   それでは、この検査が見つけるバグをそのまま隠してしまいます。エラーを一つずつ読んで判断してください。
@@ -601,6 +601,62 @@ def greet(): String = "Hi, #{this.name}"
 - **予約語のままです:** `self` は自由な名前にはなりません。`` `self` `` と書いたフィールドはこれまでどおり使えます。
 - **プロジェクト全体を更新するには:** `onion migrate src/ tests/` を実行します。コード中の `self` と、文字列の `#{...}` の中の `self` をすべて書き換えます。コメント、文字列の地の文、`\#{self}`、`` `self` `` はそのままです。
 
+## `override` は、`?` の違いを除いて基底メソッドと同じ型でなければならなくなりました
+
+基底が `Int` のところを `JInteger` にした `override` や、基底の戻り値が `Int` のところを `Int?` にした `override` は、何もオーバーライドしていませんでした。
+新しいオーバーロードとしてコンパイルされ、基底型を通した呼び出しは基底のメソッドを実行していました。
+今は **E0068** になります (#2896)。
+
+```onion
+class Base {
+public:
+  def this {}
+  def dec(k: Int): void { println("Base") }
+}
+class Up extends Base {
+public:
+  def this {}
+  override def dec(k: JInteger): void { println("Up") }   // 以前: コンパイルできた。今: E0068
+}
+val b: Base = new Up(); b.dec(1)                           // 以前: Base と表示された
+```
+
+- **表示されるもの:** **E0068** `メソッド dec(JInteger) に override が付いていますが、...` と、基底のシグネチャ（`dec(Int): void`）です。
+- **これまでどおり動くもの:** `dec(k: Int)` に対する `override def dec(k: Int?)` は、パラメータが `?` だけ違うので、今は本当にオーバーライドします。ジェネリックな上位型（`G[JInteger]`）を通したボックス型のパラメータもオーバーライドします。
+- **直し方:** オーバーライドするなら、基底の型（`dec(k: Int)` か `dec(k: Int?)`）を書いてください。別のオーバーロードとして残すなら、`override` を外し、`?` 以外でも違うパラメータ型にするか、別の名前にしてください。
+- **`onion migrate` の規則はありません:** オーバーライドのつもりかオーバーロードのつもりかは、書いた人にしか決められません。二つの直し方は別のコードを実行します。そのため、エラーが基底のシグネチャを示します。
+
+パラメータが基底メソッドと **`?` だけ違う** メソッドは、`override` の有無にかかわらず、今は同じメソッドです。
+
+- **以前:** `override` のない `def dec(k: Int?): void` は、基底の `dec(k: Int): void` とは別のオーバーロードでした。`Base` を通した `b.dec(1)` は基底を実行していました。戻り値が参照型（`String`）なら、同じメソッドがすでにオーバーライドしていました。つまり `override` は、参照型の戻り値では何も変えず、`void` やプリミティブの戻り値では結果を決めていました。
+- **今:** どの戻り値型でもオーバーライドします。`override` は、型が完全に同じときと同じく検査だけをします。どのメソッドが実行されるかは決めません。`override` がなければ、コンパイラは **W0029** で警告します（`'dec(Int?)' overrides 'dec(Int): void' of Base ...`）。基底メソッドが `final` なら、型が完全に同じときと同じく **E0039** です（`Thread` のサブクラスの `setDaemon(on: Boolean?)` も含みます）。
+- **逆向きはオーバーライドになりません (#3053):** 基底の `f(k: Int?)` に対する自前の `f(k: Int)` は、戻り値の型にかかわらずオーバーロードです。そのため、`Base` を通した `null` は基底のメソッドに届きます。以前は戻り値が参照型 (`String`) だと、アンボックスするブリッジ経由でオーバーライドになり、`Base` を通した `null` で例外が出ました。`override` を付けると **E0068** です。オーバーライドするなら、パラメータを `Int?` にしてください。オーバーロードのままにするなら `override` を外してください。
+- **`override` がなければ、今は W0030 で警告します:** `Base` を通した `b.f(1)` が、警告なしに自前のメソッドから基底のメソッドに変わったためです（`Up` → `Base`）。メッセージは `'f(Int)' does not override 'f(Int?): String' of Base ...` です。オーバーライドするなら、パラメータを `Int?` にしてください。オーバーロードのままにするなら、メソッドの名前を変えてください。
+- **既知の例外:** `A.f(Int)`、`B.f(Int?)`（`override`）、`C.f(Int): String`（`override`）という継承の連鎖は、まだブリッジでつながります。そのため、`B` を通した `null` はそこで例外を出すことがあります。
+- **W0029 を消すには:** 基底のメソッドを置き換えるつもりなら、`override` を付けてください。
+- **別のオーバーロードとして残すには:** メソッドの名前を変えてください（`decOrSkip(k: Int?)`）。`onion migrate` の規則はありません。基底のメソッドを置き換えるつもりだったかどうかは、書いた人にしか分かりません。
+
+## プリミティブ型のパラメータは、ボックス型の抽象メソッドを実装しなくなりました
+
+総称型でないインターフェースや抽象クラスが `JInteger` を取るところで、`Int` を取るクラスのメソッドが実装として受け入れられていました（逆も同じです）。
+二つをつなぐブリッジはないので、上位型を通した呼び出しは `AbstractMethodError` を投げていました。
+今は、そのクラスが **E0037** になります (#2922)。
+
+```onion
+interface I { def n(x: JInteger): String }
+class C conforms I {            // 以前: コンパイルできた。今: E0037
+public:
+  def this {}
+  def n(x: Int): String = "int " + x
+}
+val i: I = new C; println(i.n(4))   // 以前: AbstractMethodError
+```
+
+- **表示されるもの:** **E0037** `クラス C は抽象メソッド n(java.lang.Integer) を実装するか、...` と、`n(Int) はこのメソッドを実装しません。... 実装するには n(JInteger) と宣言してください。` です。
+- **これまでどおり動くもの:** 総称型の上位型（`n(x: T)` を持つ `G[JInteger]`）では、`n(x: Int)` にブリッジが作られます。`?` だけ違うパラメータ（`n(x: Int)` に対する `n(x: Int?)`）も実装になります。
+- **直し方:** 上位型のパラメータ型を書いてください（`def n(x: JInteger)`）。ほかのコードが `Int` のメソッドを呼んでいるなら、並べて残してかまいません。
+- **`onion migrate` の規則はありません:** これに当たるプログラムは、上位型を通した呼び出しを一度も実行できていません。また、二つのメソッドのどちらを実行すべきかは、書いた人にしか分かりません。そのため、ヒントが正しい書き方を示します。
+
 ## `OnionMath::randomInt` は削除されました。`Rand::nextInt` を使ってください
 
 範囲内のランダムな `Int` を得る方法が二つあり、上限の扱いが逆でした（#3069）。
@@ -659,3 +715,183 @@ IO::println(g("a" as CharSequence))    // 以前も現在も charseq
   どちらか一方の多重定義しか当てはまらない呼び出しです。
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。
+
+## `null` 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)
+
+期待される型がない `[x, null]` は、以前は non-null 型のリストでした。
+現在は nullable 型のリストになり、`null` がチェッカーから見えるようになりました。
+
+```onion
+val ys = ["a", null]
+IO::println(ys[0].length())     // 以前: 1。現在: E0070
+IO::println(ys[0]?.length())    // 以前も現在も 1
+```
+
+| プログラム | 以前 | 現在 | 直し方 |
+|---|---|---|---|
+| `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` または `ys[0]!!.length()` |
+| `total(xs: List[Int])` に対する `total([1, null])` | コンパイルでき、`null` で実行時エラー | E0005 | `List[Int?]` を受け取り、各 `null` を処理する |
+| `xs = [1, null]` のとき `val n: Int = xs[1]` | コンパイルでき、`null` で実行時エラー | E0070 | `xs[1] ?: 0` |
+| `String::join(",", ["a", null, "c"])` | `a,null,c` | E0005 | `String::join(",", ["a", null, "c"].map { s -> s ?: "null" })` |
+| `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | 内側のリストの要素型をそろえる |
+| `["a", null] + ["b"]` | コンパイルできた | E0001 | 両方を `List[String?]` にそろえる |
+| `xs = ["b", null, "a"]` のとき `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` | `[null, a, b]` | E0005 | 要素型を一度だけ書く: `Comparator::naturalOrder[String?]()` |
+| 同じ `xs` で `xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))` | `[null, a, b]` | E0005 | `String?` を比べる比較器にする: `Comparator::nullsFirst[String?]((a, b) -> a!!.compareToIgnoreCase(b!!))` |
+
+- **表示されるもの:** E0070（`may be null and cannot be dereferenced directly`）です。`List[Int]` の変数に代入した場合は E0000 です。`List[Int]` の引数や、`xs.sort(comparator)`・`Collections::sort(xs, comparator)`・`String::join` などの Java のジェネリックメソッドに渡した場合は E0005 です。原因はリテラル中の `null` です。
+- **要素型に対する Java の比較器:** `nullsFirst` は、包んだ比較器に `null` を渡しません。しかし、そのシグネチャではそれを表せません。上の二つの `sort` の行のように、型引数 `String?` を一度だけ書きます。そこでの `!!` が失敗することはありません。
+- **型を明示すれば今までどおり書けます:** `val ys: List[Int?] = [1, null]`。`null` が入らないため `List[Int]` は拒否されます。
+- **変わらないもの:** `[null]`、`[null, null]`、期待される型が分かっているリテラルです。
+- **マップリテラルも同じです (#3201):** 期待される型がないとき、`["a": "x", "b": null]` は `Map[String, String?]` になります。`t(m: Map[String, Int])` に `t(["a": 1, "b": null])` を渡すと、以前はコンパイルが通って読み取りで落ちていました。今は E0005 です。引数を `Map[String, Int?]` にするか、`null` を取り除きます。
+- **`onion migrate` の規則はありません:** `null` をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。
+
+## `f(x)` と `f(xs...)` に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)
+
+配列に `f(x)` と `f(xs...)` の両方が当てはまるとき、以前の Onion は可変長引数の方を外していました。
+Java はその配列を可変長引数の配列そのものとして扱い、`f(xs...)` を選びます。
+Onion も同じ動作になりました。
+
+```onion
+import { java.util.List as JList }
+val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+IO::println(JList::of(sa).size())             // 以前: 1。現在: 3
+IO::println(JList::of[String[]](sa).size())   // 以前も現在も 1
+```
+
+| 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|
+| `JList::of(sa).size()`、`JSet::of(sa).size()` | `1` | `3` | `JList::of[String[]](sa)` |
+| `Stream::of(sa).count()` | `1` | `3` | `Stream::of[String[]](sa)` |
+| `val n: List[String[]] = JList::of(sa)` | コンパイルできた | E0000 | `JList::of[String[]](sa)` |
+| `s(o: Object)` と `s(xs: Object...)` がある `H::s(sa)` | `s(Object)` | `s(Object...)` | `H::s(sa as Object)` |
+| `ia: Int[]` と、`a(o: Object)`・`a(xs: Object...)` がある `h.a(ia)` | `a(Object...)` | `a(Object)` | `ia` を入れた `Object[]` を渡す: `val w: Object[] = new Object[1]; w[0] = ia; h.a(w)` |
+
+- **表示されるもの:** 多くの場合は何も表示されず、別のメソッドが実行されます。
+  `List[String[]]` と宣言した変数では E0000（`type List[String[]] is expected, but type List[String] is used`）になります。
+- **`Int[]` が逆向きに変わる理由:** `Int[]` は `Object[]` ではありません。
+  そのため Java と同じく、`a(o: Object)` にしか当てはまりません。
+- **今までどおり動くもの:** 配列でない引数 1 個（`s("x")` は `s(Object)`）、引数が複数の呼び出し
+  （`s("x", "y")` は `s(Object...)`）、`s(null)` です。
+- **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、要素 1 個のつもりか配列全体のつもりかは書いた人にしか分かりません。表に各書き換えを示します。
+
+## 総称レコードのコピーが型引数を保つようになりました (#3101)
+
+以前は、総称レコードの `copy(..)` が裸の型変数のレコードを返していました。
+そのため、コピーから読んだ要素は型 `A` でした。
+現在のコピーは、`this` と同じく受け手自身の型を持ちます。
+
+```onion
+record P[A, B](x: A, y: B)
+val q = new P[String, Int]("s", 1).copy(y = 2)
+val s: String = q.x()   // 以前: E0000。現在: s
+```
+
+| プログラム | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|
+| `f(o: Object)` と `f(s: String)` がある `f(q.x())` | `f(Object)` | `f(String)` | `f(q.x() as Object)` |
+| `p: P[String, Int]` での `val r: P[Object, Int] = p.copy(y = 3)` | コンパイルできた | E0000 | `new P[Object, Int](p.x(), 3)` |
+| `take(r: P[Object, Int])` がある `take(p.copy())` | コンパイルできた | E0005 | `take(new P[Object, Int](p.x(), p.y()))` |
+
+- **表示されるもの:** E0000（`type P[Object, Int] is expected, but type P[String, Int] is used`）、
+  引数なら E0005 です。多重定義の呼び出しでは何も表示されず、別のメソッドが実行されます。
+- **代入が拒否される理由:** 型引数は不変（invariant: 型引数が違えば別の型）です。
+  `copy` を使わない `val r: P[Object, Int] = p` も、もともと E0000 でした。コピーも同じ規則に従います。
+- **今までどおり動くもの:** バイトコード、総称でないレコード、利用者が定義した `copy` メソッドです。
+- **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、どのメソッドのつもりかは書いた人にしか分かりません。表に各書き換えを示します。
+
+## ラムダ式の中の `old(...)` はエラーになりました (#2732)
+
+`old(n)` は、メソッドに入ったときの `n` の値です。この値はメソッド自身のフレーム（局所変数の置き場所）に保存されます。
+ラムダ式には別のフレームがあります。そのため、`ensures` や `history` の中のラムダ式に書いた `old(...)` は E0107 になりました。
+以前は、既定の `--contracts check` ではコンパイルされて実行できました。`--contracts runtime` では `NoSuchFieldError` で落ちていました。
+
+```onion
+// 以前: コンパイルできた。現在: E0107
+def raise(k: Int): void ensures ((x: Int) -> x >= old(n)).call(n) { n = n + k }
+// 現在: 値を引数として渡す
+def raise(k: Int): void ensures ((o: Int) -> n >= o).call(old(n)) { n = n + k }
+```
+
+- **表示されるもの:** `[E0107] old(...) はラムダ式の中では使えません` と、引数とその型から作ったヒントです。たとえば `((o: Int) -> ...).call(old(n))` と表示されます。
+- **今までどおり動くもの:** ラムダ式の外の `old(...)`、ラムダ式の `call` に引数として渡す `old(...)`、`old(...)` を使わない契約の中のラムダ式です。
+- **`onion migrate` の規則はありません:** 書き換えには、`old(...)` ごとに新しいラムダ式の引数と、その型と名前が必要です。ヒントに書き換えを示します。
+
+## 型引数の違う分岐が、期待される型で検査されるようになりました (#3241)
+
+同じ総称クラスで型引数だけが違う二つの分岐は、原型（raw: 型引数のないクラス）に合流します。
+以前は、原型の値がどの期待される型にも合っていました。
+現在は、`if`・`select`・`try` に型引数つきの期待される型があれば、各分岐をその型で検査します。
+
+```onion
+val other: Option[String] = Option::some("str")
+val tail: Option[Int] = Option::none()
+val c: Option[Int] = if b { other } else { tail }   // 以前: コンパイルできた。現在: `other` で E0000
+```
+
+| プログラム | 以前 | 現在 | コンパイルを通すには |
+|---|---|---|---|
+| `val c: Option[Int] = if b { other } else { tail }` | コンパイルでき、`c.get() + 1` が `ClassCastException` を投げた | E0000 | 分岐を期待される型にそろえるか、`Object` のような広い型にする |
+| `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | コンパイルできた | E0000 | 同上 |
+| `val lo: List[Object] = ch2(() -> if b { objs } else { strs })`（総称の `() -> U` 引数に渡すラムダ） | コンパイルでき、動いた（`List` は不変なので、もともと型安全ではなかった） | `strs` で E0000 | 分岐を `List[Object]` にそろえるか、広い型にする |
+
+- **表示されるもの:** E0000（`type Option[Int] is expected, but type Option[String] is used`）です。
+  キャレットは型の合わない分岐を指します。
+- **今までどおり動くもの:** 期待される型に合う分岐、`Object` のような期待される型、
+  期待される型のない合流です（`val c = if b { other } else { tail }` は `Option[?]` です。下の #3255 を参照）。
+- **`onion migrate` の規則はありません:** プログラムが間違った型の値を持っています。
+  どの分岐が間違いかは書いた人にしか分かりません。エラーがその分岐を指します。
+
+## 型引数が異なる分岐の合流は、生の `Option` ではなく `Option[?]` になります (#3255, #3247)
+
+同じジェネリッククラスで型引数が異なる分岐は、生のクラスに合流していました。
+生の値はどの `Option[Int]` にも入ります。今後の合流は `Option[?]` で、`Object` にだけ入ります。
+#3241 が対象にしなかった位置も塞ぎます。
+
+```onion
+val x = if b { other } else { tail }   // Option[?]
+val c: Option[Int] = x                 // 以前: コンパイルできた。今後: E0000
+```
+
+| プログラム | 以前 | 今後 | コンパイルを保つには |
+|---|---|---|---|
+| `f(x: Option[Int])` に `f(if b { other } else { tail })` | コンパイルでき、読み出しで `ClassCastException` | `other` で E0000 | 両方の分岐を引数の型に合わせます |
+| `chk(f: () -> Option[Int])` に `chk { if b { other } else { tail } }` | コンパイルできた | `other` で E0000 | 同上 |
+| `val x = if b { other } else { tail }; val c: Option[Int] = x` | コンパイルできた | E0000 | `x` に型を付けるか、分岐の型をそろえます |
+
+- **表示:** 期待される型があれば、型の合わない分岐で E0000 になり、その型（`Option[String]`）を示します。
+  期待される型がなければ、値を使う所で `Option[?]` を示す E0000 になります。
+  多重定義された関数の呼び出しでは、`Option[?]` を示す E0005 になります。
+- **変わらないもの:** `Object` などの対象、合流した値のメソッド呼び出し（`j.map { x -> .. }` の要素は `Object` です）、型が合う分岐です。
+- **空の分岐はもう一方の型になります:** `f(if b { some(1) } else { none() })`、
+  `g(if b { [1, 2] } else { [] })`、`val x = if b { some(1) } else { none() }` は今もコンパイルできます。
+  `none()`・`[]`・`[:]` は引数の型か、もう一方の分岐の型になります。
+- **`onion migrate` の規則はありません:** 値の型が誤っているため、どの分岐を直すかは書いた人にしか分かりません。
+
+## 後で宣言された呼び出し先にも、名前付き引数が名前で結び付くようになりました (#3110)
+
+名前付き引数の呼び出しが、ファイル内で後に宣言された関数やメソッドに届くようになりました。
+以前は、後の多重定義にはまだ引数名がありませんでした。
+そのため、名前付き引数の解決から外れるか、仮の引数名に一致していました。
+現在、多重定義より上にある名前付きの呼び出しは、下にある呼び出しと同じ多重定義を選びます。
+
+```onion
+def a(): Int = f(x = 1)
+def f(x: Int): Int = 100
+def f(x: Long, y: Int = 2): Int = 200
+println(a())   // 以前: 200。現在: 100（a() を f の下に書いたときと同じ）
+```
+
+| 呼び出し先（呼び出しより下で宣言） | 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|---|
+| `f(x: Int)`, `f(x: Long, y: Int = 2)` | `f(x = 1)` | `200` | `100` | `f(x = 1L)` |
+| `f(x: Int)`, `f(x: Int, y: Int = 2)` | `f(x = 1)` | `200` | E0006 | `f(x = 1, y = 2)` |
+| `b(x: Int, y: Int)` | `b(arg0 = 1, arg1 = 2)` | `12` | E0043 | `b(x = 1, y = 2)` |
+
+- **表示されるもの:** メッセージなしで別の多重定義が実行されます。
+  または **E0006**（`method call is applicable for both …`）か、
+  **E0043**（`不明なパラメータ名: arg0`）が表示されます。
+- **今までどおり動くもの:** 呼び出し先より下にある名前付きの呼び出しと、位置引数だけの呼び出しです。
+- **`onion migrate` の規則はありません:** 黙って結果が変わる呼び出しは、以前の方法で解決しないと見つかりません。
+  また、どの多重定義のつもりかは書いた人にしか分かりません。表に各書き換えを示します。

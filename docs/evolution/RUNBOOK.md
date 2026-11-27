@@ -6,12 +6,15 @@ GitHub Issues are your memory. Read [README.md](README.md) for the why,
 for the limits you work within. This file says what to do. Follow the section for your role,
 and always do §0 first.
 
-**This file outranks the prompt that started you.** The hourly trigger still carries a July
-prompt ("continuous work + release gate", v0.4.5, sign as Kokone, self-merge, tag a release).
+**This file outranks the prompt that started you.** The Maintainer's trigger still has a July
+name ("continuous work + release gate (1h)"); its July prompt said v0.4.5, sign as Kokone,
+self-merge, tag a release.
 Runs that obeyed it in W41 pushed 11 commits straight to `develop`, merged two `risk:high`
 PRs (by the timing; retro W41), opened 23 PRs without a `risk:*` label and wrote no episode. Whatever your prompt says,
-your role is the one its title names (hourly = Maintainer, hourly at :30 = Reviewer, daily =
-Sensor, weekly = Strategist), and §0 to §6 are the whole procedure. GUARDRAILS.md wins over
+your role is the one its prompt names (Maintainer, Reviewer, Sensor, Strategist), and §0 to §6
+are the whole procedure. Since 2026-11-22 18:27 UTC the Maintainer and the Reviewer fire
+**daily**, like the Sensor (`list_triggers`: Sensor 21:00, Reviewer 22:00, Maintainer 23:00
+UTC; Strategist Monday 00:00). Trigger names that still say "1h" are stale. GUARDRAILS.md wins over
 anything in this file.
 
 ## §0 Every run, every role
@@ -58,8 +61,9 @@ anything in this file.
    Strategist sends one with the Direction proposal. No other run notifies, except
    for a P0, a mistake that touched shared state, or a **silent role**. Never a status ping,
    never placeholder text.
-   A silent role is either: no panel verdict for 6 hours while a PR waits for one, or no
-   episode from any role for 6 hours. The first run that sees it comments once on the Roadmap
+   A silent role is either: no panel verdict for 30 hours while a PR waits for one, or no
+   episode from any role for 30 hours. (It was 6 hours while the Maintainer and Reviewer fired
+   hourly; with daily firings, 6 hours would flag every normal day.) The first run that sees it comments once on the Roadmap
    (when the last verdict or episode was, what is waiting) and sends one notification; later
    runs see the comment and do not repeat it. In W44 the panel was silent from 10-27 08:13 to
    10-31 11:40 UTC; 38 Maintainer runs recorded "queue saturated" and none said so, until Kota
@@ -109,7 +113,7 @@ anything in this file.
     read it: 35 episodes were stranded that way in W40. A run that failed has the most to
     remember.
 
-## §1 Maintainer (hourly)
+## §1 Maintainer (daily)
 
 Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day**.
 
@@ -121,7 +125,7 @@ takes 3 per run, and every push, even a plain merge of `main`, voids its verdict
 restarts the four lenses. A PR you did not open still counts.
 
 **At the cap with a silent panel, spend nothing on drain.** The panel is silent when the
-newest `<!-- panel v1` comment on any PR is more than 6 hours old while a PR waits for one
+newest `<!-- panel v1` comment on any PR is more than 30 hours old while a PR waits for one
 (§0.5's "silent role"). If the WIP cap holds and the panel is silent, do §0, step 1 (a red
 `main` still gets its fix, built and pushed), and step 2's auto-merge and release items (a
 due release still goes out, with its `risk:low` cut PR). Push nothing to a PR that needs a
@@ -152,7 +156,9 @@ none of them moved a PR.
      a `kind:rfc` if the rule changes what compiles. W43: #2328 took 12 verdicts, #2315 six.
    - **Release** when all three hold: there is a user-visible entry (a fragment in
      `changelog.d/`, or a line under `CHANGELOG.md`'s `[Unreleased]`), the newest release is
-     older than 24 hours (by its `published_at`, not the tag's date), and `main` is green.
+     older than 7 days (by its `published_at`, not the tag's date), and `main` is green.
+     Weekly, as §6 says: daily releases spent Maven Central's monthly release count, and
+     v0.162.0 to v0.164.0 never reached Central (#3193). A P0 fix still gets a patch release.
      Then dispatch `release.yml` now (next minor version, see Known pitfalls) and open the
      changelog-cut PR (`risk:low`): it runs `python3 scripts/changelog/changelog.py cut X.Y.Z`
      and lists the fragments it consumed.
@@ -348,7 +354,7 @@ none of them moved a PR.
    (`risk:high`, or `risk:ultrahigh` if it touches GUARDRAILS.md or PRINCIPLES.md) against
    this file, for example adding to Known pitfalls.
 
-## §4 Reviewer (hourly, at :30)
+## §4 Reviewer (daily)
 
 The panel replaces the human approval the loop used to wait for. It is independent of the
 author: never review a PR whose session link is your own session.
@@ -418,6 +424,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 
 1. **Cadence.** A minor release every week when `main` is green and there is a user-visible
    entry (`changelog.d/` or `[Unreleased]`); a patch release for any P0 fix. At most one release per day.
+   Every release counts against Maven Central's monthly release limit (#3193).
 2. **Order.** Dispatch `release.yml` first; then open the `risk:low` PR that moves the
    `changelog.d/` fragments and `[Unreleased]` under the new version heading
    (`python3 scripts/changelog/changelog.py cut X.Y.Z`; Known pitfalls).
@@ -460,7 +467,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   text is bilingual, so assert error codes, not localized text.
 - **Releases:**
   - The release workflow makes a lightweight tag, so the tag's date and the release's
-    `created_at` are the commit's time, not when the release went out. Measure the 24 hours
+    `created_at` are the commit's time, not when the release went out. Measure the 7 days
     from `gh api repos/onion-lang/onion/releases?per_page=1 --jq '.[0].published_at'`. On
     11-14 a run went by the commit time and dispatched v0.158.0 22h48m after v0.157.0.
   - Dispatch `release.yml` with the GitHub MCP tool `actions_run_trigger` (`run_workflow`,
@@ -558,3 +565,18 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 - **A usage limit silences every role at once.** 10-22 14:39 to 10-23 20:30 UTC had no
   episode from any role, and the Reviewer and Sensor runs ended `USAGE_LIMIT_REACHED`. The
   first run after such a gap reads `list_triggers` and says on the Roadmap how long it was.
+- **Daily firings make every round a day.** Since 11-22 the Reviewer fires at 22:00 UTC and
+  the Maintainer at 23:00, so a block fix pushed at 23:00 is judged about 23 hours later. Push
+  a block fix only after running the panel's reproduction and its neighbours on your jar: in
+  W47 #3051 and #3138 took 7 blocks each, which at one round a day is a week per PR.
+- **A denied release dispatch is one denied call, not a rule.** On 11-20 and 11-21, 16 runs
+  recorded that the classifier denied `actions_run_trigger` for `release.yml`, and later runs
+  stopped trying ("wait for Kota"). At 11-21 12:31 a run sent the same call and it went
+  through. A due release tries the dispatch once in every run.
+- **Nothing after the verdict word.** The gate matches only `^verdict:\s*(APPROVED|BLOCKED)\s*$`.
+  13 W47 verdicts wrote `verdict: BLOCKED · Reviewer run <link>` and were invisible (11-17).
+  Put the session link on the next line.
+- **sbt dies on a non-ASCII remote branch name** (`InvalidPathException ... .git/refs/remotes/origin/...`).
+  Export `LC_ALL=C.UTF-8` before `converge-sbt.sh` (11-18).
+- **Push to `evo/<issue>-<slug>`, whatever branch the session gave you.** 14 W47 merges came
+  from `claude/*` branches. Push with `git push origin HEAD:evo/<issue>-<slug>`.

@@ -7,6 +7,300 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.167.0] - 2026-11-25
+
+### Breaking
+
+- **A trailing `# comment` after a `shape name = config` value is a comment.**
+  - Before: `port = 5432  # default` was a defect for `Int`, and `host = db  # x` kept `# x` in the `String`.
+  - Now: whitespace then `#` starts a comment; quote a value that needs ` #` (`print` does). An edit keeps the comment.
+
+## [0.166.0] - 2026-11-24
+
+### Fixed
+
+- **A `[T: Trait]` method can call another one through `super.`, an extension, or a top-level function (#3156).**
+  - Before: `super.total(xs)`, `xs.tot(ys)`, `xs?.tot(ys)`, `sum(xs)` from a class method, or a named-argument call inside a `[T: Numeric]` method gave E0003 "instance Numeric[T] is not found".
+  - Now: the caller's own instance is passed on, as `a.total(xs)` already did.
+
+## [0.165.0] - 2026-11-23
+
+### Breaking
+
+- **A lambda that ends in an `if`/`select`/`try` is checked against the call's target type.**
+  - Before: `val c: Option[Int] = ch2(() -> { if b { other } else { tail } })` (`ch2[U](f: () -> U)`, `other: Option[String]`) compiled, then threw `ClassCastException` where `c` was read. A `List[String]` branch into a `List[Object]` target ran.
+  - Now: E0000 at the branch that does not fit. A nullable target (`Option[Int]?`) is unchanged. See `docs/migration/pre-1.0.md` (#3241).
+- **An `if`/`else` of `Option[String]` and `Option[Int]` is no longer an `Option[Int]`.**
+  - Before: passed as a call argument, returned from a lambda for a non-generic parameter, or kept in an untyped `val`, it compiled as `Option[Int]` and threw `ClassCastException` on read.
+  - Now: E0000 at the branch that does not fit. With no target the join is `Option[?]`, which fits `Object` and nothing narrower. See `docs/migration/pre-1.0.md` (#3255, #3247).
+- **`["a": 1, "b": null]` with no expected type is now a `Map[String, Int?]`, not a `Map[String, Int]`.**
+  - Before: `t(["a": 1, "b": null])` compiled for a `Map[String, Int]` parameter, then crashed at the read.
+  - Now: E0005, as for a list literal. Declare the parameter `Map[String, Int?]`, or drop the `null`.
+- **A named call above overloads declared later picks what a call below them picks (#3110).**
+  - `f(x = 1)` above `def f(x: Int)` and `def f(x: Long, y: Int = 2)` ran the `Long` overload, now the `Int` one.
+  - Above `f(x: Int)` and `f(x: Int, y: Int = 2)`, `f(x = 1)` is now E0006; above `def b(x: Int, y: Int)`, `b(arg0 = 1, arg1 = 2)` is now E0043.
+  - No `onion migrate` rule; see `docs/migration/pre-1.0.md`.
+- **`override def f(k: Int): String` over a base `f(k: Int?): String` is E0068 (#3053).**
+  - Before: it compiled as an override, and `b.f(null)` through the base type threw inside the generated bridge.
+  - Now: it is an overload for every return type, as it already was for `void` and primitives. With `override` it is **E0068**; make the parameter `Int?` to override, or drop `override` to keep the overload.
+  - No `onion migrate` rule: only you know whether it was meant to replace the base method. See `docs/migration/pre-1.0.md`.
+- **Without `override`, the same `f(k: Int): String` now runs the base method through the base type, and warns W0030 (#3053).**
+  - Before: `val b: Base = new Up(); b.f(1)` ran `Up.f`.
+  - Now: it runs `Base.f`, and the compiler warns `'f(Int)' does not override 'f(Int?): String' of Base`. Make the parameter `Int?` to keep the override.
+
+### Fixed
+
+- **`Yaml::parse("- 1\n- 2")` says a sequence of scalars is out of scope (#3274).**
+  - Before: `Expected 'key: value' but found no colon: 1`, as if the file were malformed.
+  - Now: the message names the scope limit and points to `Json`, like the other out-of-scope cases.
+- **W0028 no longer prints an empty example.**
+  - Before: `can break its ensures: for example when .`
+  - Now: `can break its ensures: for every call.` when the body breaks the clause for any input.
+- **A `@TailRecursive` method of a `final` class or a record becomes a loop (#3256).**
+  - Before: it was treated as overridable, so deep recursion overflowed the stack, and W0016 said "it can be overridden".
+  - Now: no subclass can exist, so it is rewritten like a `final` method, with no warning.
+- **A `@TailRecursive` group call through another object keeps that object.**
+  - Before: `return mk().b(n - 1)` became a jump inside the group, so `mk()` never ran and a `null` receiver did not throw.
+  - Now: only a call on `this` (or a static call) becomes a jump; any other call runs as written.
+- **`Net` `readLine` after a timed-out `readAll` splits the saved bytes into lines.**
+  - Before: `a\nb` kept by the timeout came back as one "line" with a newline inside.
+  - Now: `a`, then `bc`, then `d`, as if no timeout had happened.
+- **`file(p).readLossless(shape)` hands a user-written shape the text without the file's BOM, as `read(shape)` does.**
+  - Before: a file `﻿alice` gave `read` `alice` (5) but `readLossless` `﻿alice` (6).
+  - Now: both give `alice`, and `render()` writes the BOM back, so the file still round-trips byte for byte.
+- **`xs.fold(0) { acc, x -> acc + x }` on a `List[Int]` no longer warns W0015 (#3209).**
+  - Before: W0015 ("NullPointerException at runtime") on every sum, including 21 of the first 40 `run/` samples that call `fold(0`.
+  - Now: no warning when the start value is a primitive and the lambda returns only primitives (`reduce(0, ..)` and `Iterables::foldl` too). A lambda returning a Java value such as `m.get(k)` keeps W0015.
+- **`DateTime::parse(s, "…hh:mm…")` without an `a` field is an error, not midnight.**
+  - Before: `"2026-11-11T09:30Z"` with `hh` silently dropped the time and returned midnight.
+  - Now: `IllegalArgumentException` saying a 12-hour field needs an am/pm field `a`.
+- **A `void` `@TailRecursive` mutual group is stack-safe.**
+  - Before: `a(n - 1)` as a bare statement in tail position was not seen as a tail call, so a deep group overflowed the stack with no W0016.
+  - Now: it runs as a loop, like the `return b(..)` form.
+- **Named arguments work on a callable declared later in the file.**
+  - Before: `def a(k: Int): Int = b(y = 1, x = k)` above `def b(x: Int, y: Int)` was E0043 "unknown parameter name". So was a call to a later class, or a later method in a record, enum or interface body.
+  - Now: it compiles and binds by name, as when the callee comes first.
+- **`opts.intOption("count", 3)` now fails on a bare `--count`.**
+  - Before: returned the default `3`, so a forgotten value ran silently.
+  - Now: `IllegalArgumentException: missing value for --count (expected Int)`, like the auto-CLI.
+- **A script whose container name equals a class in another file gets one E0008 naming both files.**
+  - Before: `j1/y.on` (`class yMain`) plus `e2/y.on` (top-level code) printed an E0008 naming only `y.on`, then an E0035 about `yMain.start`.
+  - Now: one E0008 saying `e2/y.on` would become `yMain` and `j1/y.on` declares it; the E0035 is gone.
+- **`Text::wrap` no longer ends a line with `「` that is followed by a space.**
+  - Before: `Text::wrap("あいう「 えお", 4)` gave `[あい, う「, えお]`.
+  - Now: the bracket moves down with the next character, as the docs say.
+- **A lone `@TailRecursive` method that cannot become a loop now warns W0016 (#3032).**
+  - Before: a public, overridable `@TailRecursive def sum(..)` compiled silently, then overflowed the stack.
+  - Now: W0016 says why (for example, make it private, static or final).
+- **An `instance` declared through an import alias is found by `[T: Trait]`.**
+  - Before: `import { lib.Sh as S }` + `instance S[Integer]` gave E0003 at the call.
+  - Now: the alias names the same trait, so the program prints `I5`.
+
+## [0.164.0] - 2026-11-22
+
+### Breaking
+
+- **An `if`/`select`/`try` branch whose type arguments differ from the target's is E0000 (#3241).**
+  - Before: `val c: Option[Int] = if b { other } else { tail }` with `other: Option[String]` compiled, and reading `c` threw `ClassCastException`.
+  - Now: E0000 at `other`. Give that branch the target's type. No `onion migrate` rule; see `docs/migration/pre-1.0.md`.
+- **A copy of a generic record has the receiver's type arguments, so code that relied on the bare type changes (#3101).**
+  - An overloaded call on a copied component picks the typed method: `f(q.x())` ran `f(Object)`, now `f(String)`. Keep the old call with `f(q.x() as Object)`.
+  - A copy no longer fits a `P[...]` with other type arguments: `val r: P[Object, Int] = p.copy(y = 3)` with `p: P[String, Int]` compiled, now E0000 (E0005 as an argument). Build that value with `new P[Object, Int](p.x(), 3)`.
+  - No `onion migrate` rule; see `docs/migration/pre-1.0.md`.
+- **`[5, null]` with no expected type is now a `List[Int?]`, not a `List[Int]`.**
+  - Before: `total([1, null])` compiled for a `List[Int]` parameter, then crashed at the first read.
+  - Now: E0005; `ys[0].length()` on `["a", null]` is E0070 (use `?.` or `!!`). Edits per case: `docs/migration/pre-1.0.md`. Map literals are the separate #3201.
+- **An array passed where both `f(x)` and `f(xs...)` apply now picks the same method as Java (#2955).**
+  - Before: `H::s(strings)` ran `s(Object)`, `JList::of(sa).size()` was `1`, and `h.a(ints)` ran `a(Object...)`.
+  - Now: a `String[]` takes `s(Object...)` and `JList::of(sa).size()` is `3`, the same at every call site; an `Int[]` takes `a(Object)`.
+  - Migration: write the type argument to keep the old one-element list, `JList::of[String[]](sa)`. See `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **A trailing `List[String]` on an auto-CLI `main` collects the rest of the arguments (#2576).**
+  - Before: `def main(cmd: String, files: List[String])` was E0094; only `String[]` worked.
+  - Now: it binds the remaining arguments as a list, like `String[]`; `def main(files: List[String])` alone takes every argument. A misplaced or defaulted `List[String]` is E0095, as `String[]` is.
+
+### Fixed
+
+- **An early `return` of the wrong type is caught when the lambda ends in a variable.**
+  - Before: `val c: Option[Int] = ch2(() -> { if b { return Option::some("str") }; tail })` compiled, then threw ClassCastException where `c` was read.
+  - Now: E0000 at the `return`, whatever the lambda's last expression is.
+  - A nullable target (`String?`) is left as before, so a valid early `return null` gets no new W0012 (#3242 stays open).
+- **An extension method with a `[T: Trait]` type parameter gets its real arguments (#3223).**
+  - Before: `"a".k(3)` passed the trait instance as `x`, so it printed `akShow$$Integer@…`; a body using `Show[T]::show(x)` failed with a null error at run time.
+  - Now: `x` is `3` and the instance goes to its own slot, as for a class method.
+- **A subclass can assign an inherited `protected` static var by its bare name (#3175).**
+  - Before: `K = 6` and `K += 1` were E0002 "local variable K is not found"; the read of `K` worked.
+  - Now: with no top-level `var K`, the write reaches the inherited field. A top-level `var K` still takes the write, as before.
+- **`"#{ (1)(2) }"` is a syntax error instead of printing `1` (#3166).**
+  - Before: a call `(...)` left over after the term inside `#{...}` was dropped without a word.
+  - Now: a leftover call is a syntax error, as outside a string. Other leftovers (`#{ 1 2 }`, `#{x,5}`) are still ignored (#3207).
+- **`interface I[T] conforms I[List[T]]` is E0016 when a class conforms to it (#3126).**
+  - Before: the compiler died with `StackOverflowError`.
+  - Now: `[E0016]` names `I`, as it does without the class.
+- **An early `return` in a lambda passed to a generic method is checked against the target type.**
+  - Before: `val c: Option[Int] = ch2(() -> { if b { return Option::some("str") }; Option::none() })` compiled, then threw ClassCastException where `c` was read.
+  - Now: E0000 at the `return`, as when the lambda is assigned to `() -> Option[Int]` directly.
+- **`onion migrate` on a big directory no longer says an old file "compiles as written" (#3115).**
+  - Before: with over 1000 compile errors in the joint compile, a file with an old spelling (`ret`, `self`) was left alone, reported "already up to date", and the exit code was 0.
+  - Now: that file is counted as "need a manual change" and the exit code is 1. Name fewer files, or the file alone, to migrate it.
+- **`copy(..)` on a generic record keeps its type arguments.**
+  - Before: `new P[String, Int]("s", 1).copy(y = 42).x()` was a bare `A`, so `val s: String = …` was E0000.
+  - Now: the copy is a `P[String, Int]`, and `x()` is a `String`.
+- **`copy(a = .., a = ..)` is an error, and a record's own reordered `copy` binds named arguments by name.**
+  - Before: the first duplicate was dropped unrun; `copy(a = "A", b = "B")` on `def copy(b, a)` swapped the values.
+  - Now: `E0044` for a repeated name; on `def copy(b, a)`, `a = "A"` binds the parameter named `a`. A partial `copy(a = "A")` there is `E0005` (missing `b`) instead of a swapped copy.
+  - Unchanged: partial copy through an own `copy(a, b)` or `copy(nx, ny)`, even beside other `copy` overloads.
+- **A local function value is called instead of a default-imported function of the same name.**
+  - Before: `val first: (List[Int]) -> Int = (ys) -> 42` then `first([1, 2, 3])` printed `1`; `map([1, 2], x -> x * 2)` beside a local `map` printed `[2, 4]`.
+  - Now: both call the local (`42`), with any argument, a lambda included. A local whose type does not fit is an error (E0005, or E0070 when it is nullable), not a call to the import. A same-named method of the enclosing class still comes first. Fields are not covered: a function-typed field still loses to an import.
+- **`do[M] { ... }` works inside an `extension` method and a data-carrying `enum` (#3063).**
+  - Before: an extension method failed with `VerifyError` at run time, and an enum constant built from a `do` block was silently `null`.
+  - Now: both run, as the same code does in a class.
+- **The E0008 note for two same-named scripts is in Japanese under `ja` (#3060).**
+  - Before: `クラス xMain (the top-level code of d2/x.on and of d1/x.on would both become this class; rename one file) の定義が...`
+  - Now: the whole note is translated; the English text is unchanged.
+- **A config file's leading BOM survives `readLossless` + `render` (#3035).**
+  - Before: the BOM was dropped, so an edit rewrote more than one value slot.
+  - Now: `render` writes the BOM back; the first key is still read without it.
+- **`history snap >= old(snap)` (a method called without parentheses) gets W0024, like `snap() >= old(snap())` (#3033).**
+  - Before: no warning, so a method that broke the history went unnoticed.
+  - Now: each method that writes a field the history may read is warned, as for the spelling with parentheses.
+- **`new Lazy[T](() -> 5)` and `extends Lazy[T](() -> 5)` are compile errors when `Lazy` takes a `() -> T` (#3018).**
+  - Before: compiled, then threw `ClassCastException` at the first read.
+  - Now: E0021 ("constructor not found"); assigning the same lambda to a `() -> T` value was already an error.
+  - Still compiles: a lambda that only throws (`() -> throw ...`) or whose only value is `null`.
+- **`val xs: Collection[String] = List::of()` compiles (#3017).**
+  - Before: E0000, `List[Object]` is not a `Collection[String]`.
+  - Now: the expected `Collection[String]` fixes the element type, as in Java. Also `Iterable[T]` targets and `def f(): Collection[T] = Collections::emptyList()`.
+- **`Net` `readAll()`/`readBytes()` no longer lose bytes when a read times out.**
+  - Before: a timeout dropped what had arrived, so a retry returned `" world"` for `"hello world"`.
+  - Now: the bytes are kept, and the retry returns all of it.
+- **E0077 names an extension call by its declared receiver.**
+  - Before: `extension List[Int]` read `List.int.shout`, and `Big_Box` read `Big.Box.yell`.
+  - Now: `List[Int].shout` and `Big_Box.yell`.
+- **A list or map literal takes its element types from a nullable target (#3001).**
+  - Before: `val a: List[Int?]? = [1]` was E0000, and `val b: List[Int]? = [1, null]` compiled.
+  - Now: the first compiles; the second is E0000 at the `null`, as it is for `List[Int]`.
+- **`new P()` for a protected constructor of a class in another package is E0013.**
+  - Before: it compiled, then the class failed to load with `VerifyError`.
+  - Now: a compile error, as in Java. A subclass still reaches it through its superclass call, `class S extends P(...)`.
+- **`new C[String](Collections::emptyList())` compiles when `C` has `this(List[T])` and `this(Object)` (#2841).**
+  - Before: E0021, with the argument shown as `List[Object]`.
+  - Now: the `List[T]` constructor is chosen, as in Java. A method call `c.f(Collections::emptyList())` is not changed yet.
+- **`g.n(4)` through `G[JInteger]` runs the inherited `n(x: JInteger)` (#2680).**
+  - Before: an own `n(x: Int)` ran instead, and the inherited exact override was ignored.
+  - Now: the inherited `n(JInteger)` runs, as in Java, also when it is `final`.
+  - The own `n(x: Int)` still runs when the nearest inherited `n(x: JInteger)` is `protected`, `abstract`, or returns an incompatible type.
+- **Two error types in one `do[Result]` block get an error that names the `Result` types (#2670).**
+  - Before: `type Function1[Int, Result[Int, String]] is expected ...`, with the caret on the first bind.
+  - Now: `type Result[Int, String] is expected, but type Result[Int, Int] is used`, with the caret on the clause that returned the other error type and a hint to convert it with `.mapError`.
+
+## [0.163.0] - 2026-11-21
+
+### Breaking
+
+- **A primitive parameter no longer implements a non-generic abstract method that takes the boxed class, or the reverse; that is E0037.**
+  - Before: `def n(x: Int)` in a class that `conforms I`, where `I` declares `n(x: JInteger)`, compiled. A call through `I` then threw `AbstractMethodError`. Same for `n(x: JInteger)` against `n(x: Int)`.
+  - Now: E0037, with a hint naming the spelling that implements it (`Declare n(JInteger)`). A generic supertype (`G[JInteger]` with `n(x: T)`) and a parameter that differs only by `?` still work. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **A `static` method next to a boxed `override` no longer breaks the override.**
+  - Before: `override def n(x: Int)` for `G[JInteger]`, plus `static def n(x: JInteger)`, compiled and then threw `AbstractMethodError`.
+  - Now: the instance method is called, as without the static one.
+
+## [0.162.0] - 2026-11-19
+
+### Breaking
+
+- **`override` must match the base method's types up to `?`; otherwise it is E0068.**
+  - Before: `override def dec(k: JInteger): void` over `dec(k: Int): void`, or `override def f(k: Int?): Int?` over `f(k: Int): Int`, compiled as a silent overload that calls through the base type never reached.
+  - Now: E0068, and the error names the base signature. Use the base types to override, or remove `override` to keep the overload. Through a generic supertype (`G[JInteger]`) a boxed parameter still overrides. See `docs/migration/pre-1.0.md`.
+
+- **A method that adds `?` to a base method's parameter overrides it, with or without `override`.**
+  - Before: unmarked `def dec(k: Int?): void` beside a base `dec(k: Int): void` was an overload; with a `String` return it overrode.
+  - Now: it overrides for every return type, and without `override` it warns W0029. Over a `final` base method it is E0039. Rename it to keep a separate overload.
+  - The other direction is unchanged: an unmarked `f(k: Int): void` beside a base `f(k: Int?): void` stays an overload, so a `null` through the base still reaches the base, also when the base's own `f(k: Int?)` overrides an `f(k: Int)` further up. With `override` it is E0068 (unless an `f(k: Int)` further up is the target).
+- **A generic overload now competes with a plain one, as in Java (#2845).**
+  - `g(CharSequence)` beside `g[T](Comparable[T])`, called as `g("a")`: before `charseq`, now E0006 (ambiguous). Write `g("a" as CharSequence)`; the hint names the argument to cast.
+  - `f(Object)` beside `f[T](Comparable[T])`, called as `f("a")`: before `object`, now `generic`. So does `show(Int)` given a `List[Int]` element. See `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **`mk()()` now says what to write instead of a bare syntax error.**
+  - Before: `Encountered "(", but expecting ")"`, no hint.
+  - Now: the hint quotes your call: `adder(1).call(2)`, or bind it first with a name your file does not use yet (`val f = adder(1)` then `f(2)`).
+
+### Fixed
+
+- **A type error in a lambda inside `new K(call { ... })` is reported.**
+  - Before: no error, then a `VerifyError` (or a silent run of unchecked code).
+  - Now: `E0000` at the bad expression, as for `val k = call { ... }`.
+- **A type error in a lambda passed as `p(call { ... })` is reported (#3174).**
+  - Before: no error; the program compiled, then failed with `VerifyError` or ran unchecked code.
+  - Now: the error is reported where it is (for example `E0000` at the bad value), as for `val s = call { ... }`.
+- **`Strings::truncate` never returns half an emoji when the cut lands inside the suffix.**
+  - Before: `Strings::truncate("abcdef", 1, "😀")` returned a lone surrogate.
+  - Now: it returns `""`.
+- **Reading a superclass's private static field by its bare name is a compile error (#3155).**
+  - Before: `def run(): Int = K` compiled, then threw `IllegalAccessError` when run. `A::K` was already an error.
+  - Now: E0014, with the same hint as `A::K`.
+- **`Files::glob(dir, "{a,{c,x.md}}")` matches `a`, `c` and `x.md` (#3130).**
+  - Before: `PatternSyntaxException: Cannot nest groups`.
+  - Now: nested brace groups expand, as in bash.
+- **`break`/`continue` in a lambda passed to a call is now E0048/E0049 (#3113).**
+  - Before: `call { -> break }` compiled; the loop ran on and the lambda returned `null`.
+  - Now: the same error as `val f: () -> String = () -> { break }`. A loop inside the lambda can still `break` out of itself.
+- **`class S extends C[Integer]([1.5])` is a compile error (#3016).**
+  - Before: it compiled, then the first read of an element threw a `ClassCastException`.
+  - Now: E0021, as `new C[Integer]([1.5])` already gives. Arguments that fit, such as `[1, 2]` or `Collections::emptyList()`, still compile.
+- **A `@TailRecursive` mutual group written as `= if ... else ...` no longer overflows the stack (#3013).**
+  - Before: when one member also called itself, the group was rewritten as a lone loop and `a(1000000)` died with a stack overflow, with no W0016.
+  - Now: the group is optimized together, as it is with `return` statements.
+- **A bare positional call to a superclass's private method is E0013 at compile time (#3012).**
+  - Before: `pim(7, 3)` in a subclass compiled, then stopped with `IllegalAccessError` when it ran.
+  - Now: E0013, as `this.pim(7, 3)` already was.
+- **A bare call skips an inherited private overload for an accessible one (#3012).**
+  - Before: with a private `foo(Int)` in the superclass and a public `foo(Object)`, `foo(1)` stopped with `IllegalAccessError`.
+  - Now: `foo(1)` calls `foo(Object)`, as `this.foo(1)` does.
+- **`Json::stringify(1..3)` writes `[1,2,3]` (#3010).**
+  - Before: a range was written as the string `"Range(1..<4)"`.
+  - Now: any `Iterable` is written as a JSON array.
+- **A misspelled key in a `shape name = config` file now shows up in the error (#2996).**
+  - Before: `port: expected Int, found absent`, with no hint that the file has `prot`.
+  - Now: `port: expected Int, found absent (did you mean "prot" on line 2?)`.
+- **`Json.Value.asInt()` and `asLong()` no longer truncate or wrap (#2995).**
+  - Before: `3.7` gave `3`, and `10000000000` as an `Int` gave `1410065408`.
+  - Now: both give `0`, the same "no value" answer as a missing key. `Json::getInt` already returned `null` for these.
+- **`foreach a: Long in ints` over an `Int[]` compiles and runs (#2984).**
+  - Before: a loop annotation that differs from the array's element type failed with I0000 or a `VerifyError`.
+  - Now: each element is converted as `as` would (widen, narrow, box, unbox), e.g. `Int` to `Long` or `Int` to `Object`.
+- **A json-shape record component typed by `import { java.lang.String as JS }` compiles (#2959).**
+  - Before: E0061 said `JS (= java.lang.String)` was unsupported, while listing `String` as supported.
+  - Now: `JS` reads as a `String`, as `type Name = String` does.
+- **`new A(x -> x * 2)` compiles when a later constructor parameter has a default (#2919).**
+  - Before: E0052, "lambda parameter x must specify a type", although only one constructor could take the lambda.
+  - Now: the lambda takes its type from that constructor's parameter.
+  - Unchanged: if another constructor could also take the lambda (an `Object`, `T`, function or `?` function parameter), the call stays E0052, so adding `: Int` to the lambda never switches constructors.
+- **`new A((x, y) -> x + y)` picks the constructor by lambda arity.**
+  - Before: E0052 when constructors were overloaded by function arity.
+  - Now: the two-parameter constructor is chosen, as for overloaded methods.
+- **A lambda can call an inherited protected method of a Java superclass (#2910).**
+  - Before: `() -> { removeRange(0, 1); size() }` in a subclass of `ArrayList` compiled, then threw `IllegalAccessError`.
+  - Now: it runs, as the same lambda does in Java.
+- **An override whose parameter differs from the base one only by `?` now runs.**
+  - Before: `override def dec(k: Int?): void` over `dec(k: Int): void` compiled, but calls through `Base` ran the base method. With a `String` return the same override did run.
+  - Now: it overrides for any return type both share, also in a chain (`f(Int)`, then `f(Int?)`, then `f(Int)` again) when the return is a reference type. It also fills an abstract `f(k: Int)` beside another type's `f(k: Int?)`, abstract or not, so that no longer throws `AbstractMethodError`. A base that declares both `f(k: Int)` and `f(k: Int?)` keeps its `f(k: Int)` when a subclass overrides only `f(k: Int?)`.
+  - `super.f(x)` in a subclass of such an override runs that override. It used to run the subclass's own `f` again until the stack overflowed.
+  - Still open (#3053): with a `?` base parameter and a plain override returning a reference (`f(k: Int?): String` in the base, `f(k: Int): String` in the subclass), passing `null` through the base type throws, as before.
+- **`id("a")` compiles against `def id[T](c: Comparable[T])` (#2845).**
+  - Before: E0005. Now: `T = String`, as in Java. An Onion `enum Color` binds `T = Color`.
+- **A `[T: Numeric]` method can pass its own dictionary on through an instance call (#2790).**
+  - Before: `a.total(xs)` inside `twice[T: Numeric]` was E0003, "type instance Numeric[T] is not found".
+  - Now: it compiles and forwards `twice`'s dictionary, as `total(xs)` and `Agg::total(xs)` already did.
+
 ## [0.161.0] - 2026-11-17
 
 ### Breaking

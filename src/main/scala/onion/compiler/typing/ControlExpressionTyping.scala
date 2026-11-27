@@ -119,14 +119,14 @@ final class ControlExpressionTyping(
       safeMutableNarrowings(narrowing.mutablePositive, node.thenBlock).foreach { case (name, narrowedType) =>
         context.addFlowNarrowing(name, narrowedType)
       }
-      val thenTerm = typeBlockExpression(node.thenBlock, context, expected).getOrElse {
+      val thenTerm0 = typeBlockExpression(node.thenBlock, context, expected).getOrElse {
         context.restoreNarrowings(savedNarrowings)
         break(None)
       }
       context.restoreNarrowings(savedNarrowings)
 
       if (node.elseBlock == null) {
-        val thenStmt = termToStatement(node.thenBlock, thenTerm)
+        val thenStmt = termToStatement(node.thenBlock, thenTerm0)
         Some(statementTerm(new IfStatement(condition, thenStmt, null), BasicType.VOID, node.location))
       } else {
         narrowing.negative.foreach { case (name, narrowedType) =>
@@ -135,11 +135,19 @@ final class ControlExpressionTyping(
         safeMutableNarrowings(narrowing.mutableNegative, node.elseBlock).foreach { case (name, narrowedType) =>
           context.addFlowNarrowing(name, narrowedType)
         }
-        val elseTerm = typeBlockExpression(node.elseBlock, context, expected).getOrElse {
+        var elseTerm = typeBlockExpression(node.elseBlock, context, expected).getOrElse {
           context.restoreNarrowings(savedNarrowings)
           break(None)
         }
         context.restoreNarrowings(savedNarrowings)
+
+        // With no target, an empty `Option::none()`, `[]` or `[:]` branch takes the other
+        // branch's type, so the join stays `Option[Int]` rather than `Option[?]` (#3255).
+        var thenTerm = thenTerm0
+        if (expected == null) {
+          pinUnpinnedBranch(node.elseBlock, elseTerm, thenTerm.`type`, context).foreach(elseTerm = _)
+          pinUnpinnedBranch(node.thenBlock, thenTerm, elseTerm.`type`, context).foreach(thenTerm = _)
+        }
 
         var resultType = leastUpperBound(node, thenTerm.`type`, elseTerm.`type`)
         if (resultType == null) break(None)
@@ -241,21 +249,62 @@ final class ControlExpressionTyping(
 
   /**
    * Branches whose type arguments differ join as their raw class (`[t]` and
-   * `[u]` join as `List`). A raw value passes any `List[T]` target, so a
-   * target that mentions a type variable checks each branch itself: `[u]`
-   * returned as a `List[T]` stays an error, at that branch.
+   * `[u]` join as `List`). A raw value passes any `List[T]` target, so when
+   * there is an applied target each branch is checked against it instead: `[u]`
+   * returned as a `List[T]`, or an `Option[String]` branch assigned to an
+   * `Option[Int]` (#3241), stays an error, at that branch.
    */
-  private[typing] def checkErasedJoinAgainst(expected: Type, join: Type, branchTypes: Seq[Type]): Type =
-    (expected, join) match {
+  private[typing] def checkErasedJoinAgainst(expected: Type, join: Type, branchTypes: Seq[Type]): Type = {
+    def strip(t: Type): Type = t match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    // A join of different type arguments is `Option[?]` (#3255); it is checked here
+    // as the raw join was, so the error stays on the branch that does not fit.
+    val joinClass = strip(join) match {
+      case ap: AppliedClassType if ap.typeArguments.nonEmpty && ap.typeArguments.forall {
+            case w: WildcardType => w.lowerBound.isEmpty
+            case _ => false
+          } => ap.raw
+      case other => other
+    }
+    (strip(expected), joinClass) match {
       case (target: AppliedClassType, raw: ClassType)
           if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty &&
-            TypeCheckingHelpers.containsTypeVariable(target) &&
-            branchTypes.exists {
-              case ap: AppliedClassType => TypeCheckingHelpers.containsTypeVariable(ap)
+            branchTypes.map(strip).exists {
+              case ap: AppliedClassType =>
+                TypeRelations.sameClass(ap.raw, raw) ||
+                  (TypeCheckingHelpers.containsTypeVariable(target) && TypeCheckingHelpers.containsTypeVariable(ap))
               case _ => false
-            } => target
+            } => expected
       case _ => join
     }
+  }
+
+  /**
+   * A branch that is only a generic call or a collection literal (`Option::none()`, `[]`,
+   * `[:]`) with nothing to pin its type arguments, so they are all `Object`: re-typed
+   * against the other branch's applied type of the same class. Kept only when that
+   * re-type reports nothing and gives exactly that type.
+   */
+  private def pinUnpinnedBranch(block: AST.BlockExpression, term: Term, other: Type, context: LocalContext): Option[Term] = {
+    val single = block.elements match {
+      case List(e @ (_: AST.StaticMethodCall | _: AST.UnqualifiedMethodCall | _: AST.ListLiteral | _: AST.MapLiteral)) => e
+      case _ => return None
+    }
+    (term.`type`, other) match {
+      case (mine: AppliedClassType, target: AppliedClassType)
+          if TypeRelations.sameClass(mine.raw, target.raw) && !(mine eq target) &&
+            mine.typeArguments.nonEmpty && mine.typeArguments.forall(_ eq bodyContext.rootClass) &&
+            !TypeCheckingHelpers.containsTypeVariable(target) &&
+            !target.typeArguments.exists(_.isInstanceOf[WildcardType]) =>
+        val errorsBefore = typing.suppressedErrorCount
+        val retyped = typing.withSuppressedReporting(typed(single, context, target))
+        retyped.filter(t => typing.suppressedErrorCount == errorsBefore && t.`type` != null &&
+          TypeRules.isAssignable(target, t.`type`) && TypeRules.isAssignable(t.`type`, target))
+      case _ => None
+    }
+  }
 
   private[typing] def assignBranch(node: AST.Node, term: Term, resultVar: ClosureLocalBinding, resultType: Type): ActionStatement =
     if (term.`type`.isBottomType) {

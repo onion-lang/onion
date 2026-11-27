@@ -14,6 +14,9 @@ final class MethodCallTyping(
 ) {
   private val callArgumentTypingSupport = new CallArgumentTypingSupport(bodyContext, typed(_, _, _), processAssignable, processAssignableForJavaCallee)
   private val methodInvocationBuilderSupport = new MethodInvocationBuilderSupport(typing, this)
+  private[typing] def reportDuplicateArgument(node: AST.Node, name: String): Unit =
+    bodyContext.report(DUPLICATE_ARGUMENT, node, name)
+
   private val methodCallReportingSupport = new MethodCallReportingSupport(bodyContext)
   private val methodTargetTypingSupport = new MethodTargetTypingSupport(bodyContext)
   private val memberSelectionResolutionSupport = new MemberSelectionResolutionSupport(typing, bodyContext, this)
@@ -221,7 +224,7 @@ final class MethodCallTyping(
     typeArgs: List[AST.TypeNode],
     classSubst: scala.collection.immutable.Map[String, Type],
     expected: Type,
-    context: LocalContext = null
+    context: LocalContext
   )(
     prepareParams: Array[Type] => Option[Array[Term]],
     buildRawCall: Array[Term] => Term
@@ -235,7 +238,9 @@ final class MethodCallTyping(
         case n: AST.UnqualifiedMethodCall => n.args
         case _ => Nil
       }
-      if (args.nonEmpty && !ArgumentHelpers.hasNamedArguments(args)) {
+      // Only when each argument is its own parameter: an extension call's receiver takes
+      // slot 0, so its arguments and parameters do not line up.
+      if (args.nonEmpty && args.length == params.length && !ArgumentHelpers.hasNamedArguments(args)) {
         val retyped = retypeTargetTypedClosures(node, method, args, params, classSubst, context, expected)
         if (retyped ne params) System.arraycopy(retyped, 0, params, 0, params.length)
       }
@@ -416,9 +421,10 @@ final class MethodCallTyping(
     name: String,
     target: Term,
     targetType: ObjectType,
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
-    methodCallFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, expected)
+    methodCallFallbackSupport.tryZeroArgExtensionAccess(node, name, target, targetType, context, expected)
 
   /** Safe-nav variant of `tryZeroArgExtensionAccess`: `expr?.name` resolves `def name: T` in an extension block. */
   private[typing] def tryZeroArgExtensionAccessForSafeNav(
@@ -426,9 +432,10 @@ final class MethodCallTyping(
     name: String,
     target: Term,
     targetType: ObjectType,
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
-    methodCallFallbackSupport.tryZeroArgExtensionAccessForSafeNav(node, name, target, targetType, expected)
+    methodCallFallbackSupport.tryZeroArgExtensionAccessForSafeNav(node, name, target, targetType, context, expected)
 
   /** Resolve a safe-call (?.) against extension methods, building SafeStaticExtensionCall. */
   private[typing] def tryExtensionMethodCallForSafeNav(
@@ -436,11 +443,12 @@ final class MethodCallTyping(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
     if (methodCallFallbackSupport.hasErasureTwinExtension(targetType, node.name, target))
-      typing.withSuppressedReporting(methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected))
-    else methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
+      typing.withSuppressedReporting(methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, context, expected))
+    else methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, context, expected)
 
   /** Resolve an operator convention method via an `extension` block; None on miss. */
   private[typing] def tryExtensionOperatorMethod(

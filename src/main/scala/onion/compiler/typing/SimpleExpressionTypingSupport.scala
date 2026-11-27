@@ -241,6 +241,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
   private def expectedListElement(expected: Type): Type = expected match {
     case app: AppliedClassType if app.raw.name == "java.util.List" && app.typeArguments.length == 1 =>
       app.typeArguments(0)
+    // `List[Int?]?`: the literal is never null, so the outer `?` only widens the target (#3001).
+    case n: NullableType => expectedListElement(n.innerType)
     case _ => null
   }
 
@@ -299,6 +301,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
     val expectedElem = expectedListElement(expected)
     var elementType: Type = null
     var failed = false
+    var sawNull = false
     var incompatibleLeft: Type = null
     var incompatibleRight: Type = null
 
@@ -321,6 +324,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
         } else {
           typedElements(index) = typedElement
           val normalizedType = normalizeListElementType(typedElement.`type`)
+          if (normalizedType.isNullType) sawNull = true
           if (elementType == null) {
             elementType = normalizedType
           } else {
@@ -364,6 +368,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
         // element (not their join) is what makes the mixed-subtype case work; it is
         // sound because a literal creates a fresh list of that element type.
         else if (expectedElem != null && typedElements.forall(fitsExpectedElement)) expectedElem
+        // No target type: a `null` element makes the element type nullable, so
+        // `[5, null]` is a List[Int?] and cannot slip into a List[Int] slot (#2998).
+        else if (sawNull && !elementType.isNullType && !elementType.isInstanceOf[NullableType]) NullableType.of(elementType)
         else elementType
       val elements =
         if (finalElementType eq expectedElem) typedElements.map(widenToSlot(_, expectedElem))
@@ -481,8 +488,13 @@ private[compiler] final class SimpleExpressionTypingSupport(
       // next (a bare, receiver-less, parens-less call resolving like
       // `self.<name>`), before this bare name is reported as not found (#2013).
       trySelfMethodQuiet(node, context)
-    else if ((field.modifier & AST.M_STATIC) != 0)
+    else if ((field.modifier & AST.M_STATIC) != 0) {
+      // An inherited private static field is as unreachable bare as through `A::K` (#3155).
+      // The error is reported here and the term kept, so the caller does not add "not found".
+      if (!MemberAccess.isMemberAccessible(field, bodyContext.definition))
+        bodyContext.report(FIELD_NOT_ACCESSIBLE, node, field.affiliation, node.name, bodyContext.definition)
       Some(new RefStaticField(node.location, bodyContext.definition, field))
+    }
     else if (!context.isStatic)
       typeMemberSelection(AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name), context)
     else None
@@ -551,6 +563,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
   private def expectedMapKeyValue(expected: Type): (Type, Type) = expected match {
     case app: AppliedClassType if app.raw.name == "java.util.Map" && app.typeArguments.length == 2 =>
       (app.typeArguments(0), app.typeArguments(1))
+    case n: NullableType => expectedMapKeyValue(n.innerType)
     case _ => (null, null)
   }
 
@@ -560,6 +573,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
     val (expectedKey, expectedValue) = expectedMapKeyValue(expected)
     var keyType: Type = null
     var valueType: Type = null
+    var sawNullKey = false
+    var sawNullValue = false
     var failed = false
 
     val order = node.entries.zipWithIndex.sortBy { case ((_, v), _) => if (isEmptyCollectionLiteral(v)) 1 else 0 }
@@ -582,6 +597,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
           values(index) = typedValue
           val normalizedKey = normalizeListElementType(typedKey.`type`)
           val normalizedValue = normalizeListElementType(typedValue.`type`)
+          if (normalizedKey.isNullType) sawNullKey = true
+          if (normalizedValue.isNullType) sawNullValue = true
           if (keyType == null) {
             keyType = normalizedKey
             valueType = normalizedValue
@@ -615,10 +632,14 @@ private[compiler] final class SimpleExpressionTypingSupport(
       val finalKeyType =
         if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass)
         else if (expectedKey != null && keys.forall(k => fitsExpected(expectedKey, k))) expectedKey
+        // No target type: a `null` key or value makes that type nullable, as in a list
+        // literal, so `["a": 1, "b": null]` is a Map[String, Int?] (#3201).
+        else if (sawNullKey && !keyType.isNullType && !keyType.isInstanceOf[NullableType]) NullableType.of(keyType)
         else keyType
       val finalValueType =
         if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass)
         else if (expectedValue != null && values.forall(v => fitsExpected(expectedValue, v))) expectedValue
+        else if (sawNullValue && !valueType.isNullType && !valueType.isInstanceOf[NullableType]) NullableType.of(valueType)
         else valueType
       val finalKeys = if (finalKeyType eq expectedKey) keys.map(widenToSlot(_, expectedKey)) else keys
       val finalValues = if (finalValueType eq expectedValue) values.map(widenToSlot(_, expectedValue)) else values

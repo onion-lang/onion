@@ -48,9 +48,28 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
 
       val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
       args.foreach {
-        case AST.NamedArgument(_, argName, value) => named(argName) = value
+        case na @ AST.NamedArgument(_, argName, value) =>
+          // A name given twice is E0044, as for an ordinary call; the first one would never run (#3100).
+          if (named.contains(argName)) {
+            calls.reportDuplicateArgument(na, argName)
+            break(Some(None))
+          }
+          named(argName) = value
         case _ => break(None) // positional args (or a mix): use the regular path
       }
+      // This path fills the call by component position, so it serves only an own `copy`
+      // overload that takes one argument per component and names no component in another
+      // position: `copy(a, b)` and `copy(nx, ny)` qualify, the reordered `copy(b, a)` does
+      // not. Overloads of another arity cannot take this call and do not matter. With no
+      // qualifying overload, or when the one chosen by type does not qualify, the call is an
+      // ordinary named-argument call, bound by parameter name (#3100).
+      val componentNames = components.map(_._1)
+      def takesComponentsInOrder(m: Method): Boolean = {
+        val names = m.argumentsWithDefaults.map(_.name)
+        names.length == componentNames.length && names.indices.forall(i =>
+          names(i) == componentNames(i) || !componentNames.contains(names(i)))
+      }
+      if (declaresCopy && !definition.methods("copy").exists(takesComponentsInOrder)) break(None)
       for (argName <- named.keys if !components.exists(_._1 == argName)) {
         if (declaresCopy) break(None)
         calls.reportMethodNotFound(node, targetType, s"copy(${argName} = ...)", Array[Type]())
@@ -135,8 +154,9 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
       // `copy(b = f(), a = g())` runs `f()` first, as every other named call does (#2801).
       val orderedParams = ArgumentHelpers.evaluateInWrittenOrder(args, components.map(_._1), fullParams, context)
       targetType.findMethod("copy", orderedParams) match {
+        case Array(method, _*) if declaresCopy && !takesComponentsInOrder(method) => None
         case Array(method, _*) =>
-          calls.buildResolvedCall(node, method, orderedParams, typeArgs, classSubst, null)(
+          calls.buildResolvedCall(node, method, orderedParams, typeArgs, classSubst, null, context)(
             expectedArgs => calls.processParamsWithExpected(node, orderedParams, expectedArgs),
             finalParams => buildRawCall(method, finalParams)
           ) match {

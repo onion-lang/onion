@@ -256,7 +256,8 @@ object MigrateCommand:
       val other = asWritten.problems.find { p =>
         !pending.exists { case (file, (_, result)) => !unparsed(file) && p.file.contains(file.toString) && atPlace(p, result) }
       }
-      val decides = asWritten.typed && other.isEmpty
+      // A compile cut off at the error cap proves nothing about a file with no error in it.
+      val decides = asWritten.typed && other.isEmpty && !asWritten.capped
       val candidates = pending.keySet.filter(file => !unparsed(file) && failing(asWritten.problems, file).nonEmpty).toSet
       // A removed library call is rewritten only where the compiler reports it (#3116 block 5):
       // a `randomInt` it resolved (a user's own `OnionMath`, an inherited method) keeps its
@@ -291,7 +292,7 @@ object MigrateCommand:
         else asWritten
       pending.foreach { case (file, (source, result)) =>
         val mine = failing(asWritten.problems, file)
-        if mine.isEmpty && !unparsed(file) && asWritten.typed then compilesAsWritten(file, result)
+        if mine.isEmpty && !unparsed(file) && asWritten.typed && !asWritten.capped then compilesAsWritten(file, result)
         else if !decides then cannotTell(file, result, asWritten.problems, other.orElse(asWritten.problems.headOption))
         else if unparsed(file) then
           val left = failing(withYield.problems, file)
@@ -388,15 +389,19 @@ object MigrateCommand:
       def render(display: Path => String): String =
         file.fold(message)(f => s"${display(Path.of(f))}:$line:$column: $message")
 
-    /** The errors of one compile, and whether it got as far as type checking. */
-    final case class Report(problems: Seq[Problem], typed: Boolean)
+    /**
+     * The errors of one compile, and whether it got as far as type checking. `capped` is true
+     * when the compiler stopped reporting at its error limit, so a file with no error here may
+     * only be one whose errors were cut off (#3115).
+     */
+    final case class Report(problems: Seq[Problem], typed: Boolean, capped: Boolean = false)
 
     /** The errors compiling `sources` together against `classpath`; empty when it compiles. */
     def problems(sources: Seq[(Path, String)], classpath: Seq[String]): Seq[Problem] =
       check(sources, classpath).problems
 
     def check(sources: Seq[(Path, String)], classpath: Seq[String]): Report =
-      val config = CompilerConfig(classpath, null, "UTF-8", "", 1000,
+      val config = CompilerConfig(classpath, null, "UTF-8", "", MaxErrors,
         warningLevel = onion.compiler.WarningLevel.Off)
       try
         val inputs = sources.map((file, text) => StringInputSource(text, file.toString))
@@ -405,9 +410,11 @@ object MigrateCommand:
           val location = Option(e.location)
           Problem(Option(e.sourceFile), location.fold(0)(_.line), location.fold(0)(_.column), e.message, e.errorCode)
         }
-        Report(problems, result.timings.exists(_.name == TypingPhaseName))
+        Report(problems, result.timings.exists(_.name == TypingPhaseName), problems.size >= MaxErrors)
       catch
         case error: (Exception | StackOverflowError) =>
           Report(Seq(Problem(None, 0, 0, s"the compiler failed: $error")), false)
 
     private val TypingPhaseName = "Typing"
+
+    private val MaxErrors = 1000

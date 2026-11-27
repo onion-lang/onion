@@ -44,6 +44,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type
   ): Option[Option[Term]] =
     val user = collectExtensionMethods(targetType, node.name, isBoxedPrimitive(target)).filterNot(isBuiltinExtension)
@@ -52,7 +53,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     if (user.isEmpty || user.exists(m => !(m.receiverType eq user.head.receiverType))) None
     else selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.Selected(m) if !isBuiltinExtension(m) && !lambdaCouldRetypeToAnother(m, user, node, params) =>
-        Some(buildExtensionCall(node, target, targetType, params, expected, m))
+        Some(buildExtensionCall(node, target, targetType, params, context, expected, m))
       case _ => None
     }
 
@@ -81,18 +82,39 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term], target: Term = null): Boolean =
     selectApplicableExtensionMethod(targetType, name, params, isBoxedPrimitive(target)).isInstanceOf[CandidateSelection.Ambiguous[?]]
 
+  /**
+   * A receiver whose type arguments are all `?`, as a join of `List[Int]` and `List[String]`
+   * is (#3255), is read at their bounds for an extension call: `j.map { x -> .. }` sees an
+   * `Object` element, as it did on the raw join.
+   */
+  private def wildcardsAtBound(node: AST.Node, target: Term, targetType: ObjectType): Option[(Term, ObjectType)] =
+    targetType match {
+      case ap: AppliedClassType if ap.typeArguments.nonEmpty && ap.typeArguments.forall {
+            case w: WildcardType => w.lowerBound.isEmpty
+            case _ => false
+          } =>
+        val read = AppliedClassType(ap.raw, ap.typeArguments.toList.map(_.asInstanceOf[WildcardType].upperBound))
+        Some((new AsInstanceOf(node.location, target, read), read))
+      case _ => None
+    }
+
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type,
     reportIfNotFound: Boolean = true
   ): Option[Term] = {
+    wildcardsAtBound(node, target, targetType) match {
+      case Some((t, tt)) => return tryExtensionMethodCall(node, t, tt, params, context, expected, reportIfNotFound)
+      case None =>
+    }
     selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
-      case CandidateSelection.NoMatch if arrayAsList(node, target, targetType).isDefined =>
-        val (listTarget, listType) = arrayAsList(node, target, targetType).get
-        tryExtensionMethodCall(node, listTarget, listType, params, expected, reportIfNotFound)
+      case CandidateSelection.NoMatch if arrayAsList(node, target, targetType, context).isDefined =>
+        val (listTarget, listType) = arrayAsList(node, target, targetType, context).get
+        tryExtensionMethodCall(node, listTarget, listType, params, context, expected, reportIfNotFound)
       case CandidateSelection.NoMatch =>
         // reportIfNotFound is false when the caller has a further fallback to try
         // (e.g. a bean-property getter) and will report the error itself if that fails.
@@ -110,7 +132,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         )
         None
       case CandidateSelection.Selected(extMethod) =>
-        buildExtensionCall(node, target, targetType, params, expected, extMethod)
+        buildExtensionCall(node, target, targetType, params, context, expected, extMethod)
     }
   }
 
@@ -223,14 +245,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
    *  the array as `toList()` and that `List` type, when the array has no extension of
    *  the called name itself but `List` does. `map`/`filter` keep their own array
    *  overloads; an array of primitives (`Int[]`) is left alone, as `toList` takes `T[]`. */
-  private def arrayAsList(node: AST.MethodCall, target: Term, targetType: ObjectType): Option[(Term, ObjectType)] =
+  private def arrayAsList(node: AST.MethodCall, target: Term, targetType: ObjectType, context: LocalContext): Option[(Term, ObjectType)] =
     targetType match {
       case at: ArrayType if (at.dimension > 1 || !at.component.isBasicType) &&
           collectExtensionMethods(targetType, node.name).isEmpty =>
         selectApplicableExtensionMethod(targetType, "toList", Array.empty, widen = false) match {
           case CandidateSelection.Selected(toList) =>
             val toListNode = node.copy(name = "toList", args = Nil, typeArgs = Nil)
-            buildExtensionCall(toListNode, target, targetType, Array.empty, null, toList).collect {
+            buildExtensionCall(toListNode, target, targetType, Array.empty, context, null, toList).collect {
               case term if term.`type`.isInstanceOf[ObjectType] &&
                   collectExtensionMethods(term.`type`.asInstanceOf[ObjectType], node.name).nonEmpty =>
                 (term, term.`type`.asInstanceOf[ObjectType])
@@ -290,6 +312,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type,
     extMethod: ExtensionMethodDefinition
   ): Option[Term] = {
@@ -311,11 +334,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         None
       case Array(staticMethod) =>
         val classSubst = TypeSubstitution.classSubstitution(containerClass)
-        calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
+        calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected, context)(
+          // Defaults are filled before the dictionaries are injected, so a `[T: Trait]`
+          // method's trailing dictionary slots line up with its formals (#3223).
+          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs).map(withDefaults(staticMethod, _)),
           // finalParams(0) is the processed receiver; drop it — codegen handles
           // the receiver from node.target (null-check + optional unbox)
-          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, withDefaults(staticMethod, finalParams).tail)
+          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, finalParams.tail)
         )
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
@@ -332,6 +357,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type
   ): Option[Term] =
     selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
@@ -346,7 +372,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         )
         None
       case CandidateSelection.Selected(extMethod) =>
-        buildSafeExtensionCall(node, target, targetType, params, expected, extMethod)
+        buildSafeExtensionCall(node, target, targetType, params, context, expected, extMethod)
     }
 
   /**
@@ -363,6 +389,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     name: String,
     target: Term,
     targetType: ObjectType,
+    context: LocalContext,
     expected: Type
   ): Option[Term] = {
     val params = Array.empty[Term]
@@ -386,7 +413,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         containerClass.findMethod(name, staticArgs) match {
           case Array(staticMethod) =>
             val classSubst = TypeSubstitution.classSubstitution(containerClass)
-            calls.buildResolvedCall(node, staticMethod, staticArgs, Nil, classSubst, expected)(
+            calls.buildResolvedCall(node, staticMethod, staticArgs, Nil, classSubst, expected, context)(
               expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
               finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, finalParams.tail)
             )
@@ -400,6 +427,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     target: Term,
     targetType: ObjectType,
     params: Array[Term],
+    context: LocalContext,
     expected: Type,
     extMethod: ExtensionMethodDefinition
   ): Option[Term] = {
@@ -420,9 +448,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         None
       case Array(staticMethod) =>
         val classSubst = TypeSubstitution.classSubstitution(containerClass)
-        calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
-          finalParams => new CallStatic(containerClass, staticMethod, withDefaults(staticMethod, finalParams))
+        calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected, context)(
+          // Defaults first, then the dictionaries (#3223): injected into a short argument
+          // list, a dictionary overwrote the last real argument and kept its null default.
+          expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs).map(withDefaults(staticMethod, _)),
+          finalParams => new CallStatic(containerClass, staticMethod, finalParams)
         )
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
@@ -457,6 +487,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     name: String,
     target: Term,
     targetType: ObjectType,
+    context: LocalContext,
     expected: Type
   ): Option[Term] = {
     val params = Array.empty[Term]
@@ -475,7 +506,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         containerClass.findMethod(name, staticArgs) match {
           case Array(staticMethod) =>
             val classSubst = TypeSubstitution.classSubstitution(containerClass)
-            calls.buildResolvedCall(node, staticMethod, staticArgs, Nil, classSubst, expected)(
+            calls.buildResolvedCall(node, staticMethod, staticArgs, Nil, classSubst, expected, context)(
               expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
               finalParams => new CallStatic(containerClass, staticMethod, finalParams)
             )
@@ -498,6 +529,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type,
     untypedClosureIndices: Set[Int]
   ): Option[Term] = boundary {
+    wildcardsAtBound(node, target, targetType) match {
+      case Some((t, tt)) => break(tryExtensionMethodCallBidirectional(node, t, tt, context, expected, untypedClosureIndices))
+      case None =>
+    }
     val name = node.name
     val args = node.args.toArray
 
@@ -510,7 +545,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
 
     val candidates = collectExtensionMethods(targetType, name, isBoxedPrimitive(target)).filter(_.arguments.length == args.length)
-    if (candidates.isEmpty) arrayAsList(node, target, targetType) match {
+    if (candidates.isEmpty) arrayAsList(node, target, targetType, context) match {
       case Some((listTarget, listType)) =>
         break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
       case None =>

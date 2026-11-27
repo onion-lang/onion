@@ -44,9 +44,21 @@ public final class Text {
                         line.append(piece);
                         lineWidth += sep + pw;
                     } else {
+                        // An opening bracket left at the end of the line moves down with the piece.
+                        String carry = "";
+                        int cut = line.length();
+                        while (cut > 0) {
+                            int cp = line.codePointBefore(cut);
+                            if (NO_LINE_END.indexOf(cp) < 0) break;
+                            cut -= Character.charCount(cp);
+                        }
+                        if (cut > 0 && cut < line.length()) {
+                            carry = line.substring(cut);
+                            line.setLength(cut);
+                        }
                         lines.add(line.toString());
-                        line = new StringBuilder(piece);
-                        lineWidth = pw;
+                        line = new StringBuilder(carry).append(piece);
+                        lineWidth = displayWidth(carry) + pw;
                     }
                     firstPiece = false;
                 }

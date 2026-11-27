@@ -145,13 +145,13 @@ private[compiler] final class InstanceMethodCallSupport(
         // left in charge: it resolves overloads like Colls.map vs Iterables.map
         // that would incorrectly surface as ambiguous if tried with typed params.
         if (target.`type`.isBasicType) {
-          val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
+          val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, context, expected, reportIfNotFound = false)
           if (ext.isDefined) return ext
         }
         // Every lambda here declares its parameter types (params are typed), so a user
         // extension (one, or several overloads) can take them as they are; re-typing the
         // bodies per candidate made nested calls exponential (#2463).
-        val userExt = fallback.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
+        val userExt = fallback.tryUserExtensionWithTypedArguments(node, target, targetType, params, context, expected)
         if (userExt.isDefined) return userExt.get
         return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, closureIndices)
       }
@@ -159,7 +159,7 @@ private[compiler] final class InstanceMethodCallSupport(
       // user-declared extension wins), then a bean-property getter as a last
       // resort. The getter fallback lets `e.message()` resolve to getMessage() like
       // `e.message` does, so parens are optional on property accessors too.
-      val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
+      val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, context, expected, reportIfNotFound = false)
       if (ext.isDefined) return ext
       if (fallback.isAmbiguousExtensionCall(targetType, name, params, target)) return None
       if (params != null && params.length == 0) {

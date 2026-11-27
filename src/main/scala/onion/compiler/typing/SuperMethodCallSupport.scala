@@ -62,7 +62,7 @@ private[compiler] final class SuperMethodCallSupport(
         // the direct superclass's arguments alone, Box's `T` came back
         // unsubstituted (#2308).
         val classSubst = TypeSubstitution.hierarchySubstitution(contextClass.superClass, method.affiliation, selfReceiver = true)
-        calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected)(
+        calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected, context)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, parameters, expectedArgs),
           finalParams =>
             if (context.isClosure) superCallThroughAccessor(contextClass, method, finalParams)
@@ -74,7 +74,7 @@ private[compiler] final class SuperMethodCallSupport(
         interfaceDefault(node, contextClass, parameters) match {
           case Right((iface, method)) =>
             val classSubst = TypeSubstitution.hierarchySubstitution(iface, method.affiliation, selfReceiver = true)
-            calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected)(
+            calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected, context)(
               expectedArgs => calls.prepareCallParams(node, node.args, method, parameters, expectedArgs),
               finalParams =>
                 if (context.isClosure) superCallThroughAccessor(contextClass, method, finalParams, iface)
@@ -202,7 +202,7 @@ private[compiler] final class SuperMethodCallSupport(
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(contextClass.superClass, method.affiliation, selfReceiver = true)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
               .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams =>

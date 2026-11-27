@@ -504,12 +504,16 @@ L2 も満たす shape を *lossless* と呼びます——`isLossless()` がそ�
 部分はバイト単位で再現され、意図的に変更した値だけが書き直されます。`Residue` は
 不透明な値で、生成した shape にだけ渡し戻してください。
 
+`file(p).readLossless(shape)` は、`read(shape)` と同じく先頭のバイトオーダーマーク（BOM）を
+取り除いたテキストを shape に渡します。`render()` が BOM を書き戻します。そのため、自作の
+shape を含むすべての lossless shape で、往復はバイト単位で一致します。
+
 `Lossless[T]` そのものが lens です:`value()`/`residue()` でペアを読み、
 `withValue(v)` は residue を保ったまま値だけ差し替え、`edit { v -> ... }` は更新を
 値にフォーカスします。`render()` がテキストを再構成します:
 
 ```onion
-val r   = configShape.parseLossless(file"app.conf".text()).get()
+val r   = file"app.conf".readLossless(configShape).get()
 val out = r.edit { v -> v.copy(port = 9090) }.render()
 // diff app.conf out  ->  1行だけ変わる
 ```
@@ -1245,6 +1249,7 @@ v["users"][0]["name"].asString()
 キーが存在しない・添字が範囲外のときは null を保持する `Value` を返すので、途中の欠損があっても例外にはなりません
 （末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
 要素数（それ以外は `0`）を調べられ、`raw()` で内部表現（`Map`/`List`/scalar/`null`）を直接取り出せます。
+`asInt()` / `asLong()` は、小数（`3.7`）や型の範囲外の数に対して、切り捨てや桁あふれをした値ではなく `0` を返します。
 
 `Json::parseOrNull(json)` は `Json::parse(json)` と同じですが、不正な入力に対して例外
 `Json.JsonParseException` を投げる代わりに `null` を返します。パース失敗を別扱いのエラーではなく
@@ -2098,19 +2103,24 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  （onion.Colls::reduc
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
-**`fold`/`reduce`/`foldl` は最も素朴な使い方自体で警告が出ます**: `Colls::fold`
-と `Colls::reduce` の3引数版（`Iterables::foldl` も同様）はいずれも Java の
-ジェネリックメソッド（`<T, R> R fold(List<T>, R, Function2<R, T, R>)`）であり、
-*宣言された*戻り値の型は型変数 `R` そのもの -- Onion が null 許容性を追跡でき
-ないボックス化された参照型 -- で、呼び出し側の引数が `R` を何に確定させよう
-としても関係ありません。そのため `List[Int]` に対する `xs.fold(0) { a, b ->
-a + b }` / `xs.reduce(0, (acc, x) -> acc + x)` のように、リテラルのゼロと
-`Int` を返すコンビネータだけを使った、最も素直な書き方でも、non-null な `Int`
-へ代入する際に `[W0015]` の形でアンボックスされます -- 実際には何も null に
-なり得ないにもかかわらず、`Json::getInt` がキー欠落時に出す警告と同じもの
-です。`Double` ではない合計値を得る Onion ネイティブな、警告の出ない代替手段
-は無く（`Stats::sum`/`sumBy` は `Double` を返す）、意図した呼び出しであれば
-`--Wno platform-unboxing` で警告を抑制してください。
+**`fold`/`reduce`/`foldl` は初期値から始まるため、プリミティブだけの畳み込みは null になりません**:
+`Colls::fold` と `Colls::reduce` の3引数版（`Iterables::foldl` も同様）は Java の
+ジェネリックメソッド（`<T, R> R fold(List<T>, R, Function2<R, T, R>)`）なので、
+宣言上の戻り値の型は型変数 `R` です。初期値が null でないプリミティブで、
+ラムダがプリミティブだけを返すなら、結果も null ではありません。
+`Int` へ代入しても `[W0015]` は出ません。
+
+```onion
+val total: Int = xs.fold(0) { a, b -> a + b }        // 警告なし
+val t: Int = keys.fold(0) { a, k -> m.get(k) }      // [W0015]: Map.get は null を返し得る
+```
+
+ラムダが `null` を返す場合は従来どおり `[W0012]`、初期値が `Int?` の場合は
+従来どおり `E0070` です。次の場合は `[W0015]` が残ります。
+
+- ラムダが `m.get(k)` のような Java の値を返す
+- ラムダではない関数値を渡す
+- `Colls::getOrDefault` など、ほかのジェネリックな static メソッド
 
 **`first`/`last` もシャドーイングされますが、無害です**: `onion.Colls` にも
 消去後シグネチャが同じ `first(List)`/`last(List)` 拡張メソッドがあり、

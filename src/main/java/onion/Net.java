@@ -116,12 +116,38 @@ public final class Net {
         private final java.io.ByteArrayOutputStream partial = new java.io.ByteArrayOutputStream();
         // The last line ended with a bare CR, so a following LF still has to be swallowed.
         private boolean pendingCr = false;
+        // Bytes a timed-out readBytes had read; later reads consume them before the socket.
+        private final java.io.ByteArrayOutputStream bulk = new java.io.ByteArrayOutputStream();
+        private byte[] stash = new byte[0];
+        private int stashPos = 0;
+
+        // Moves what a timed-out readBytes kept behind any bytes still waiting in the stash.
+        private void stashBulk() {
+            if (bulk.size() == 0) return;
+            java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+            all.write(stash, stashPos, stash.length - stashPos);
+            byte[] b = bulk.toByteArray();
+            all.write(b, 0, b.length);
+            bulk.reset();
+            stash = all.toByteArray();
+            stashPos = 0;
+        }
+
+        // The next byte: the stash first, then the socket.
+        private int nextByte() throws IOException {
+            if (stashPos < stash.length) return stash[stashPos++] & 0xff;
+            return input.read();
+        }
 
         private void skipLfAfterCr() throws IOException {
             if (!pendingCr) return;
-            input.mark(1);
-            int c = input.read();
-            if (c != '\n' && c != -1) input.reset();
+            if (stashPos < stash.length) {
+                if (stash[stashPos] == '\n') stashPos++;
+            } else {
+                input.mark(1);
+                int c = input.read();
+                if (c != '\n' && c != -1) input.reset();
+            }
             pendingCr = false;
         }
 
@@ -133,9 +159,10 @@ public final class Net {
          */
         public String readLine() {
             try {
+                stashBulk();
                 skipLfAfterCr();
                 int c;
-                while ((c = input.read()) != -1 && c != '\n' && c != '\r') {
+                while ((c = nextByte()) != -1 && c != '\n' && c != '\r') {
                     partial.write(c);
                 }
                 if (c == -1 && partial.size() == 0) return null;
@@ -157,6 +184,9 @@ public final class Net {
         /**
          * Everything until the peer closes, undecoded.
          *
+         * If a read times out, the bytes already read are kept, so a later `readLine`,
+         * `readAll` or `readBytes` still sees them.
+         *
          * A byte array rather than a List because this is the Java boundary — the same
          * place `Files::readBytes` sits — and a List of boxed bytes for a megabyte of
          * payload would be absurd.
@@ -164,16 +194,34 @@ public final class Net {
         public byte[] readBytes() {
             try {
                 skipLfAfterCr();
-                InputStream in = input;
-                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-                partial.writeTo(out);
-                partial.reset();
+                // Read into `bulk`, so a timeout keeps what arrived; a retry continues it.
+                // Bytes a line read left in the stash come first, then a half-read line.
+                if (stashPos < stash.length) {
+                    java.io.ByteArrayOutputStream head = new java.io.ByteArrayOutputStream();
+                    head.write(stash, stashPos, stash.length - stashPos);
+                    byte[] b = bulk.toByteArray();
+                    head.write(b, 0, b.length);
+                    bulk.reset();
+                    bulk.write(head.toByteArray(), 0, head.size());
+                    stash = new byte[0];
+                    stashPos = 0;
+                }
+                if (partial.size() > 0) {
+                    byte[] p = partial.toByteArray();
+                    byte[] b = bulk.toByteArray();
+                    partial.reset();
+                    bulk.reset();
+                    bulk.write(p, 0, p.length);
+                    bulk.write(b, 0, b.length);
+                }
                 byte[] buffer = new byte[BUFFER];
                 int read;
-                while ((read = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, read);
+                while ((read = input.read(buffer)) != -1) {
+                    bulk.write(buffer, 0, read);
                 }
-                return out.toByteArray();
+                byte[] all = bulk.toByteArray();
+                bulk.reset();
+                return all;
             } catch (IOException e) {
                 throw new RuntimeException("Net: read failed on " + remoteAddress()
                     + " (" + e.getMessage() + ")", e);

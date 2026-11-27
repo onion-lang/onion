@@ -327,17 +327,29 @@ final class AssignmentTyping(
    * top-level vars. None when no such static field exists (falls back to local).
    */
   /** The static field a bare name assigns through when it has no local binding: one of
-    * the current class, else a top-level var on the script's synthetic class. */
+    * the current class, else a top-level var on the script's synthetic class, else (only
+    * when neither has a field of that name) a static inherited from a superclass, as a
+    * bare read sees it (#3175). The top-level var keeps priority over the inherited
+    * static, so a program that compiled before still writes the same field (#3202). */
   private[typing] def implicitStaticField(name: String): Option[(ClassType, FieldRef)] =
-    Option(bodyContext.definition.field(name)).map(f => (bodyContext.definition, f))
-      .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).map(f => (tc, f))))
-      .filter { case (_, field) => (field.modifier & AST.M_STATIC) != 0 }
+    def isStatic(f: FieldRef): Boolean = (f.modifier & AST.M_STATIC) != 0
+    val own = Option(bodyContext.definition.field(name))
+    val topLevel = bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).map(f => (tc, f)))
+    if (own.isDefined || topLevel.isDefined)
+      own.map(f => (bodyContext.definition, f)).orElse(topLevel).filter { case (_, f) => isStatic(f) }
+    else
+      Option(bodyContext.definition.findField(name)).filter(isStatic).map(f => (bodyContext.definition, f))
 
   private def processImplicitStaticFieldAssign(
     owner: ClassType, field: FieldRef, node: AST.Assignment, context: LocalContext
   ): Term = {
     val value = typed(node.rhs, context, field.`type`).getOrElse(null)
     if (value == null) null
+    else if (!MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+      // An inherited private static is as unreachable bare as through `A::K` (#3155, #3175).
+      bodyContext.report(FIELD_NOT_ACCESSIBLE, node.lhs, field.affiliation, field.name, bodyContext.definition)
+      null
+    }
     else if (isReadOnly(field)) {
       bodyContext.report(CANNOT_ASSIGN_TO_VAL, node.lhs, field.name)
       null

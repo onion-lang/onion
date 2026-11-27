@@ -545,4 +545,68 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       assert(out.contains("E0021"), out)
     }
   }
+
+  // #3016: a slot made concrete by the parent's type arguments (`extends C[Integer](..)`)
+  // was matched by erasure only, so a List[Double] reached a List[Integer] field and threw
+  // a ClassCastException at the first read. `new C[Integer]([1.5])` was already E0021.
+  describe("a superclass constructor slot made concrete by the parent's type arguments (#3016)") {
+    val listC =
+      """import { java.util.* }
+        |class C[T] {
+        |public:
+        |  val xs: List[T]
+        |  def this(xs: List[T]) { this.xs = xs }
+        |}
+        |""".stripMargin
+
+    it("rejects a List[Double] literal for List[Integer] at compile time") {
+      val src = listC +
+        """class S extends C[Integer]([1.5])
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val n: Integer = new S().xs[0]
+          |    return "ran " + n
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+      assert(!out.contains("cannot be cast"), out)
+    }
+
+    it("rejects a List[Number] variable for List[String]") {
+      val src = listC +
+        """class S(ys: List[Number]) extends C[String](ys)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+
+    it("still accepts arguments that fit the concrete slot") {
+      val src = listC +
+        """class A extends C[Integer]([1, 2])
+          |class B extends C[Number]([1.5])
+          |class E extends C[String](Collections::emptyList())
+          |class F extends C[String]([])
+          |class G extends C[Integer?]([3, null])
+          |class H(ys: List[String]) extends C[String](ys)
+          |class J extends ArrayList[String](List::of("j"))
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new A().xs + new B().xs + new E().xs + new F().xs + new G().xs + new H(["h"]).xs + new J()
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[1, 2][1.5][][][3, null][h][j]"), out)
+    }
+  }
 }

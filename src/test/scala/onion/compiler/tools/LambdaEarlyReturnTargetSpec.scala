@@ -1,0 +1,156 @@
+package onion.compiler.tools
+
+import onion.compiler.{CompilerConfig, OnionCompiler, StreamInputSource, WarningLevel}
+import onion.tools.Shell
+
+import java.io.StringReader
+
+/**
+ * Issue #3117: an early `return` in a block lambda passed to a generic method was
+ * not checked against the type the call's target pins. The early return and the
+ * last expression joined to a raw type (`Option`), which fit the target
+ * `Option[Int]`, so `return Option::some("str")` compiled and the program failed
+ * later with ClassCastException.
+ */
+class LambdaEarlyReturnTargetSpec extends AbstractShellSpec {
+
+  private def run(body: String, name: String) =
+    shell.run("import { onion.Option; java.util.List; }\n" + body, name, Array())
+
+  private def w12Lines(source: String): Seq[Int] = {
+    val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On)
+    val result = new OnionCompiler(config)
+      .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "W.on")))
+    assert(!result.hasErrors, s"unexpected errors: ${result.diagnostics}")
+    result.diagnostics.warnings.filter(_.category.code == "W0012").map(_.location.line).toSeq
+  }
+
+  describe("an early `return null` into a nullable target is not a W0012 (#3239 panel)") {
+    it("String? target with an early return null and a generic-call-free tail") {
+      val lines = w12Lines(
+        """def ch2[U](f: () -> U): U = f()
+          |def pick(b: Boolean): String? = ch2(() -> {
+          |  if b { return null }
+          |  "x"
+          |})
+          |println(pick(true)); println(pick(false))
+          |""".stripMargin)
+      assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+
+    it("Option[Int]? target with a variable tail") {
+      val lines = w12Lines(
+        """def ch2[U](f: () -> U): U = f()
+          |val none: Option[Int] = Option::none()
+          |val n: Option[Int]? = ch2(() -> {
+          |  if 1 > 2 { return null }
+          |  none
+          |})
+          |println(n)
+          |""".stripMargin)
+      assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+  }
+
+  describe("an early return in a lambda is checked against the call's target type (#3117)") {
+    it("Option[String] returned early where the target pins Option[Int] (the issue's repro)") {
+      val result = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val c: Option[Int] = ch2(() -> {
+          |  if 1 < 2 { return Option::some("str") }
+          |  Option::none()
+          |})
+          |def main(args: String[]): String = "" + (c.get() + 1)
+          |""".stripMargin,
+        "EarlyReturnOption.on"
+      )
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("a list literal returned early, and a concrete last expression") {
+      val list = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val c: List[Int] = ch2(() -> {
+          |  if 1 < 2 { return ["s"] }
+          |  [1]
+          |})
+          |def main(args: String[]): String = "" + (c[0] + 1)
+          |""".stripMargin,
+        "EarlyReturnList.on"
+      )
+      assert(Shell.Failure(-1) == list)
+      val some = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val c: Option[Int] = ch2(() -> {
+          |  if 1 < 2 { return Option::some("str") }
+          |  Option::some(3)
+          |})
+          |def main(args: String[]): String = "" + c
+          |""".stripMargin,
+        "EarlyReturnSome.on"
+      )
+      assert(Shell.Failure(-1) == some)
+    }
+
+    it("well-typed early returns still compile and run") {
+      val result = run(
+        """def ch2[U](f: () -> U): U = f()
+          |def pick(b: Boolean): Option[Int] = ch2(() -> {
+          |  if b { return Option::some(7) }
+          |  Option::none()
+          |})
+          |def main(args: String[]): String = "" + pick(true) + " " + pick(false)
+          |""".stripMargin,
+        "EarlyReturnOk.on"
+      )
+      assert(Shell.Success("Some[value=7] None[]") == result)
+    }
+
+    it("the last expression is a variable or a field access (#3234)") {
+      val variable = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val tail: Option[Int] = Option::none()
+          |val c: Option[Int] = ch2(() -> {
+          |  if 1 < 2 { return Option::some("str") }
+          |  tail
+          |})
+          |def main(args: String[]): String = "" + (c.get() + 1)
+          |""".stripMargin,
+        "EarlyReturnVariableTail.on"
+      )
+      assert(Shell.Failure(-1) == variable)
+      val local = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val c: List[Int] = ch2(() -> {
+          |  val xs: List[Int] = [1]
+          |  if 1 < 2 { return ["s"] }
+          |  xs
+          |})
+          |def main(args: String[]): String = "" + (c[0] + 1)
+          |""".stripMargin,
+        "EarlyReturnLocalTail.on"
+      )
+      assert(Shell.Failure(-1) == local)
+    }
+
+    it("well-typed early returns with a variable tail still compile and run (#3234)") {
+      val result = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val none: Option[Int] = Option::none()
+          |def pick(b: Boolean): Option[Int] = ch2(() -> {
+          |  if b { return Option::some(7) }
+          |  none
+          |})
+          |def widen(b: Boolean): Object = ch2(() -> {
+          |  if b { return 1 }
+          |  val s = "x"
+          |  s
+          |})
+          |def main(args: String[]): String = "" + pick(true) + " " + pick(false) + " " + widen(true) + widen(false)
+          |""".stripMargin,
+        "EarlyReturnVariableOk.on"
+      )
+      assert(Shell.Success("Some[value=7] None[] 1x") == result)
+    }
+  }
+}

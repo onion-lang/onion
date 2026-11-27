@@ -222,7 +222,9 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     val names = method.typeParameters.map(_.name).toSet
     var updated: Array[Term] = null
     for (i <- weak) {
-      val formal = TypeSubstitution.substituteType(method.arguments(i), classSubst, subst, defaultToBound = false)
+      val pinned = TypeSubstitution.substituteType(method.arguments(i), classSubst, subst, defaultToBound = false)
+      // A nullable target: the lambda may return `null`, so its result type is nullable too (#3242).
+      val formal = if (nullableTarget) withNullableResult(pinned) else pinned
       if (formal != null && !mentionsAny(formal, names)) {
         // A re-type that muted an error (a `return 42` in a lambda now typed to return
         // `Option[Int]`) is not kept: the original lambda reports it, as without the re-type.
@@ -251,6 +253,18 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
       }
     }
     if (updated == null) params else updated
+  }
+
+  /** `() -> R` as `() -> R?`: the last type argument of a function type made nullable. */
+  private def withNullableResult(t: Type): Type = t match {
+    case fn: AppliedClassType if fn.typeArguments.nonEmpty =>
+      fn.typeArguments.last match {
+        case _: NullableType => t
+        case r if r != null && !r.isBasicType && !r.isNullType =>
+          AppliedClassType(fn.raw, fn.typeArguments.init.toList :+ NullableType.of(r))
+        case _ => t
+      }
+    case _ => t
   }
 
   /** Whether the call, with its arguments as first typed, yields a result the target accepts. */
@@ -313,8 +327,8 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
         case AST.ReturnExpression(_, result) => result != null && isMalleable(result)
         case e: AST.Expression => isMalleable(e)
         case _ => false
-      }) || (!nullableTarget && (ReturnNodeDetector.containsReturn(closure.body) ||
-        isBranching(closure.body.elements.last))))
+      }) || (ReturnNodeDetector.containsReturn(closure.body) ||
+        isBranching(closure.body.elements.last)))
   }
 
   /**

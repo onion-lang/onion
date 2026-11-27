@@ -452,6 +452,10 @@ private[typing] object GenericMethodTypeArguments {
             // infers, instead of leaving T to default to Object (#2594).
             case bt: BasicType if bt != BasicType.VOID && !bt.isNullType =>
               unify(apf, typing.boxedTypeArgument(bt), position, returnContext)
+            // A nullable expected return (`val b: Option[String]? = Option::none()`) pins the
+            // type arguments through the type inside the `?` (#3242).
+            case n: TypedAST.NullableType if returnContext =>
+              unify(apf, n.innerType, position, returnContext)
             case _ =>
         case _ =>
     }

@@ -38,6 +38,31 @@ class LambdaEarlyReturnTargetSpec extends AbstractShellSpec {
       assert(lines.isEmpty, s"W0012 lines: $lines")
     }
 
+    it("Option[Int]? target with a generic-call tail (#3242)") {
+      val lines = w12Lines(
+        """def ch2[U](f: () -> U): U = f()
+          |val n: Option[Int]? = ch2(() -> {
+          |  if 1 > 2 { return null }
+          |  Option::none()
+          |})
+          |println(n)
+          |""".stripMargin)
+      assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+
+    it("String? target with a generic-call tail (#3242)") {
+      val lines = w12Lines(
+        """def ch2[U](f: () -> U): U = f()
+          |def id[T](t: T): T = t
+          |def pick(b: Boolean): String? = ch2(() -> {
+          |  if b { return null }
+          |  id("x")
+          |})
+          |println(pick(true))
+          |""".stripMargin)
+      assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+
     it("Option[Int]? target with a variable tail") {
       val lines = w12Lines(
         """def ch2[U](f: () -> U): U = f()
@@ -49,6 +74,27 @@ class LambdaEarlyReturnTargetSpec extends AbstractShellSpec {
           |println(n)
           |""".stripMargin)
       assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+  }
+
+  describe("a nullable target pins a generic factory's type arguments (#3242)") {
+    it("`val b: Option[String]? = Option::none()` compiles and runs") {
+      val result = run(
+        """val b: Option[String]? = Option::none()
+          |println(b)
+          |""".stripMargin, "NullableFactory.on")
+      assert(result.isInstanceOf[Shell.Success], result.toString)
+    }
+
+    it("a branch tail that disagrees with a nullable target is still an error") {
+      val result = run(
+        """def ch2[U](f: () -> U): U = f()
+          |val tail: Option[Int] = Option::none()
+          |val other: Option[String] = Option::some("str")
+          |val c: Option[Int]? = ch2(() -> { if 1 < 2 { other } else { tail } })
+          |println(c)
+          |""".stripMargin, "NullableBranch.on")
+      assert(result == Shell.Failure(-1), result.toString)
     }
   }
 

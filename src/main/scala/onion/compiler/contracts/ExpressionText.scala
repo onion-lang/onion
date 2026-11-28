@@ -12,6 +12,7 @@ object ExpressionText {
     case AST.Id(_, n)                       => n
     case AST.UnqualifiedFieldReference(_, n) => n
     case AST.IntegerLiteral(_, v, _)        => v.toString
+    case AST.CurrentInstance(_)             => "this"
     case AST.BooleanLiteral(_, v)           => v.toString
     case AST.StringLiteral(_, v)            => "\"" + v + "\""
     case AST.Not(_, t)                      => "!" + wrap(t)

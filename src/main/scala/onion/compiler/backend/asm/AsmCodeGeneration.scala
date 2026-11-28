@@ -83,6 +83,9 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
      *  the enclosing instance: the closure class is not a subclass, so the JVM refuses the call
      *  (#2910). Each gets a synthetic accessor on the host, emitted with the host's methods. */
     val protectedAccessors = mutable.LinkedHashMap[TypedAST.Method, String]()
+    /** The same for protected fields a closure reads or writes (#3218): keyed by the field,
+     *  the class the access names, and whether it is a write. */
+    val protectedFieldAccessors = mutable.LinkedHashMap[(TypedAST.FieldRef, String, Boolean), String]()
     var lastVisitor: AsmCodeGenerationVisitor = null
     var lastVisitorGen: GeneratorAdapter = null
     var lastVisitorLocals: LocalVarContext = null
@@ -112,7 +115,54 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         Some(st.protectedAccessors.getOrElseUpdate(method, "access$" + method.name + "$" + st.protectedAccessors.size))
       case _ => None
 
+  /** The name of the static host-class accessor a closure must call to read (`write = false`)
+   *  or write a protected field of a foreign-package superclass, or None when a direct access
+   *  is legal. `owner` is the class the access names. An instance field qualifies only when it
+   *  is reached through the host instance (`target` is the host type), as for methods.
+   *  A read accessor takes the instance (if any) and returns the value; a write accessor takes
+   *  the instance (if any) and the value, and returns nothing. */
+  private[asm] def protectedFieldAccessorFor(field: TypedAST.FieldRef, owner: String, write: Boolean, target: Option[TypedAST.Type]): Option[String] =
+    val st = state
+    val isStatic = Modifier.isStatic(field.modifier)
+    def throughHost = target.exists {
+      case ct: TypedAST.ClassType => ct.name == st.host.name
+      case _ => false
+    }
+    if st == null || !Modifier.isProtected(field.modifier) || st.host.isInterface then None
+    else if packageOf(field.affiliation.name) == packageOf(st.host.name) then None
+    else if !isStatic && !throughHost then None
+    else
+      val key = (field, owner, write)
+      Some(st.protectedFieldAccessors.getOrElseUpdate(key,
+        "access$" + (if write then "set$" else "get$") + field.name + "$" + st.protectedFieldAccessors.size))
+
+  /** The descriptor of the accessor `protectedFieldAccessorFor` names. */
+  private[asm] def protectedFieldAccessorDescriptor(field: TypedAST.FieldRef, write: Boolean): String =
+    val fieldType = asmType(field.`type`)
+    val self = if Modifier.isStatic(field.modifier) then Nil else List(AsmUtil.objectType(state.host.name))
+    if write then AsmType.getMethodDescriptor(AsmType.VOID_TYPE, (self :+ fieldType)*)
+    else AsmType.getMethodDescriptor(fieldType, self*)
+
+  /** The class whose code (methods and closures) is being generated. */
+  private[asm] def currentHostName: String = state.host.name
+
   private def emitProtectedAccessors(cw: ClassWriter, hostName: String): Unit =
+    for ((field, owner, write), accessor) <- state.protectedFieldAccessors do
+      val fieldType = asmType(field.`type`)
+      val ownerType = AsmUtil.objectType(owner)
+      val isStatic = Modifier.isStatic(field.modifier)
+      val desc = protectedFieldAccessorDescriptor(field, write)
+      val access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC
+      val gen = MethodEmitter.newGenerator(cw, access, accessor, AsmType.getReturnType(desc), AsmType.getArgumentTypes(desc))
+      gen.visitCode()
+      if !isStatic then gen.loadArg(0)
+      if write then
+        gen.loadArg(if isStatic then 0 else 1)
+        if isStatic then gen.putStatic(ownerType, field.name, fieldType) else gen.putField(ownerType, field.name, fieldType)
+      else
+        if isStatic then gen.getStatic(ownerType, field.name, fieldType) else gen.getField(ownerType, field.name, fieldType)
+      gen.returnValue()
+      gen.endMethod()
     for (method, accessor) <- state.protectedAccessors do
       val argTypes = method.arguments.map(asmType)
       val ret = asmType(method.returnType)

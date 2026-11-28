@@ -47,6 +47,19 @@ final class MethodCallTyping(
   ): Option[Array[Term]] =
     argumentRetyping.retypeArguments(sourceType, name, args, params, context, filter, receiverType)
 
+  /** See [[ArgumentExpectedTypeRetyping.retypeArgumentsForOverloads]] (#2841). */
+  private[typing] def retypeArgumentsForOverloads(
+    sourceType: ObjectType,
+    name: String,
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    context: LocalContext,
+    filter: Method => Boolean,
+    receiverType: Type,
+    resolves: (Array[Term], Method) => Boolean
+  ): Option[Array[Term]] =
+    argumentRetyping.retypeArgumentsForOverloads(sourceType, name, args, params, context, filter, receiverType, resolves)
+
   /** See [[ArgumentExpectedTypeRetyping.retypeTargetTypedClosures]] (#3067). */
   private[typing] def retypeTargetTypedClosures(
     callNode: AST.Node,

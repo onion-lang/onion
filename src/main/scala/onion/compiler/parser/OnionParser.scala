@@ -2319,7 +2319,20 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (kind(1) == K.LBRACE && (looksLike(trailingLambdaHead()) || !inCondition())) trailingLambda() else null
 
   private def typeArgsThenParen(): Boolean =
-    kind(1) == K.LBRACKET && looksLike { typeArguments(); eols(); expect(K.LPAREN) }
+    kind(1) == K.LBRACKET && looksLike { typeArguments(); if (!trailingLambdaAhead()) { eols(); expect(K.LPAREN) } }
+
+  /** After explicit type arguments: a call written with only a trailing lambda,
+   *  `C::m[T] { a -> ... }` anywhere, `C::m[T] { body }` outside a condition (#3200). */
+  private def trailingLambdaAhead(): Boolean =
+    kind(1) == K.LBRACE && (looksLike(trailingLambdaHead()) || !inCondition())
+
+  /** After explicit type arguments in a `::`/`super.`/bare call: `(`, or a trailing lambda with no parentheses. */
+  private def parenOrLambdaAhead(): Unit =
+    if (!trailingLambdaAhead()) expect(K.LPAREN)
+
+  /** The `(args)` after explicit type arguments, absent when only a trailing lambda follows. */
+  private def argsAfterTypeArgs(): List[AST.Expression] =
+    if (kind(1) == K.LPAREN) { next(); val es = terms(); expect(K.RPAREN); es } else Nil
 
   private def dotSuffix(e: AST.Expression): AST.Expression = {
     val t = expect(K.DOT)
@@ -2327,11 +2340,14 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val n = id()
     if (typeArgsThenParen()) {
       val tas = typeArguments()
-      eols()
-      expect(K.LPAREN)
-      eols()
-      var args = terms()
-      expect(K.RPAREN)
+      var args: List[AST.Expression] = Nil
+      if (!trailingLambdaAhead()) {
+        eols()
+        expect(K.LPAREN)
+        eols()
+        args = terms()
+        expect(K.RPAREN)
+      }
       val tl = trailingLambdaOpt()
       args = AST.appendToList(args, tl)
       AST.MethodCall(through(n), e, c(n), args, tas)
@@ -2356,11 +2372,14 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val n = id()
     if (typeArgsThenParen()) {
       val tas = typeArguments()
-      eols()
-      expect(K.LPAREN)
-      eols()
-      var args = terms()
-      expect(K.RPAREN)
+      var args: List[AST.Expression] = Nil
+      if (!trailingLambdaAhead()) {
+        eols()
+        expect(K.LPAREN)
+        eols()
+        args = terms()
+        expect(K.RPAREN)
+      }
       val tl = trailingLambdaOpt()
       args = AST.appendToList(args, tl)
       AST.SafeMethodCall(p(t), e, c(n), args, tas)
@@ -2436,9 +2455,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       return AST.TraitMethodCall(through(n), ty, tas, c(n), es)
     }
     if (isBasicKind(kind(1))) {
-      if (looksLike { boxedClassType(); expect(K.COLON2); id(); typeArguments(); expect(K.LPAREN) }) {
+      if (looksLike { boxedClassType(); expect(K.COLON2); id(); typeArguments(); parenOrLambdaAhead() }) {
         val ty = boxedClassType(); expect(K.COLON2); val n = id(); val tas = typeArguments()
-        expect(K.LPAREN); var es = terms(); expect(K.RPAREN)
+        var es = argsAfterTypeArgs()
         es = AST.appendToList(es, trailingLambdaOpt())
         return AST.StaticMethodCall(through(n), ty, c(n), es, tas)
       }
@@ -2454,9 +2473,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       }
     }
     if (isId(kind(1)) && kind(2) == K.DOT) {
-      if (looksLike { dottedClassType(); expect(K.COLON2); id(); typeArguments(); expect(K.LPAREN) }) {
+      if (looksLike { dottedClassType(); expect(K.COLON2); id(); typeArguments(); parenOrLambdaAhead() }) {
         val ty = dottedClassType(); expect(K.COLON2); val n = id(); val tas = typeArguments()
-        expect(K.LPAREN); var es = terms(); expect(K.RPAREN)
+        var es = argsAfterTypeArgs()
         es = AST.appendToList(es, trailingLambdaOpt())
         return AST.StaticMethodCall(through(n), ty, c(n), es, tas)
       }
@@ -2471,9 +2490,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         return staticMemberOrCall(t, n, ty, trailingLambdaOpt())
       }
     }
-    if (looksLike { classType(); expect(K.COLON2); id(); typeArguments(); expect(K.LPAREN) }) {
+    if (looksLike { classType(); expect(K.COLON2); id(); typeArguments(); parenOrLambdaAhead() }) {
       val ty = classType(); expect(K.COLON2); val n = id(); val tas = typeArguments()
-      expect(K.LPAREN); var es = terms(); expect(K.RPAREN)
+      var es = argsAfterTypeArgs()
       es = AST.appendToList(es, trailingLambdaOpt())
       return AST.StaticMethodCall(through(n), ty, c(n), es, tas)
     }
@@ -2507,11 +2526,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def primary(): AST.Expression = {
     if (kind(1) == K.K_SUPER) {
-      if (looksLike { expect(K.K_SUPER); eols(); expect(K.DOT); eols(); id(); typeArguments(); expect(K.LPAREN) }) {
+      if (looksLike { expect(K.K_SUPER); eols(); expect(K.DOT); eols(); id(); typeArguments(); parenOrLambdaAhead() }) {
         val t = next(); eols(); expect(K.DOT); eols()
         val n = id()
         val tas = typeArguments()
-        expect(K.LPAREN); var es = terms(); expect(K.RPAREN)
+        var es = argsAfterTypeArgs()
         es = AST.appendToList(es, trailingLambdaOpt())
         return AST.SuperMethodCall(p(t), c(n), es, tas)
       }
@@ -2528,10 +2547,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def primaryRest(): AST.Expression = {
     val k = kind(1)
     if (isId(k)) {
-      if (kind(2) == K.LBRACKET && looksLike { id(); typeArguments(); expect(K.LPAREN) }) {
+      if (kind(2) == K.LBRACKET && looksLike { id(); typeArguments(); parenOrLambdaAhead() }) {
         val t = id()
         val tas = typeArguments()
-        expect(K.LPAREN); var es = terms(); expect(K.RPAREN)
+        var es = argsAfterTypeArgs()
         es = AST.appendToList(es, trailingLambdaOpt())
         return AST.UnqualifiedMethodCall(through(t), c(t), es, tas)
       }

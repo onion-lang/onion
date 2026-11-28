@@ -8,13 +8,19 @@ class ContractTextSpec extends AnyFunSpec {
   private def parse(text: String): AST.Expression = ContractText.read(text).get
 
   describe("a clause the writer stores") {
-    for (clause <- Seq("x > 0", "x >= 0 && x < 100", "result == x * 2", "n >= old(n)", "!(a == b)", "n + 1 <= 10"))
+    for (clause <- Seq("x > 0", "x >= 0 && x < 100", "result == x * 2", "n >= old(n)", "!(a == b)", "n + 1 <= 10", "this.n > k"))
       it(s"reads back as the same text: $clause") {
         val e = parse(clause)
         val stored = ContractText.write(e)
         assert(stored.isDefined, clause)
         assert(ContractText.read(stored.get).map(ExpressionText.of) == Some(ExpressionText.of(e)))
       }
+  }
+
+  describe("a clause that mentions this") {
+    it("is shown as written, not with `...` in place of this") {
+      assert(ExpressionText.of(parse("this.n > k")) == "this.n > k")
+    }
   }
 
   describe("a clause the writer does not store") {

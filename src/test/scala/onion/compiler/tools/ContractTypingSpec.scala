@@ -131,7 +131,6 @@ class ContractTypingSpec extends AnyFunSpec {
 
     it("never prints a half-rendered argument in the E0107 lambda hint (#3240)") {
       val srcs = Seq(
-        "class A {\n  var n: Int\npublic:\n  def this { n = 1 }\n  def h(): void ensures ((x: Int) -> x >= old(this.n)).call(n) { n = n + 1 }\n}",
         "class A {\n  var n: Int\n  var s: String\npublic:\n  def f(): void ensures ((x: Int) -> x >= old(n + s.length())).call(n) { n = n + 1 }\n}")
       for (src <- srcs) {
         val shown = compile(src, ContractMode.Check).filter(_.message.contains("old(")).map(_.message).mkString("\n")
@@ -140,6 +139,14 @@ class ContractTypingSpec extends AnyFunSpec {
         assert(!shown.contains("old(n + ...)"), shown)
         assert(shown.contains("`((o: Int) -> n >= o).call(old(n))`"), shown)
       }
+    }
+
+    it("shows `this` as written in the E0107 lambda hint (#3264)") {
+      val src = "class A {\n  var n: Int\npublic:\n  def this { n = 1 }\n  def h(): void ensures ((x: Int) -> x >= old(this.n)).call(n) { n = n + 1 }\n}"
+      val shown = compile(src, ContractMode.Check).filter(_.message.contains("old(")).map(_.message).mkString("\n")
+      assert(codes(src).contains("E0107"), codes(src).toString)
+      assert(shown.contains("((o: Int) -> ...).call(old(this.n))"), shown)
+      assert(!shown.contains("...."), shown)
     }
 
     it("runs old() passed into a lambda as an argument, the edit E0107 suggests (#2732)") {

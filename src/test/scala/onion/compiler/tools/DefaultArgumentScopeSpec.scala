@@ -250,4 +250,21 @@ class DefaultArgumentScopeSpec extends AbstractShellSpec {
       assert(errs.head.message.contains("later"))
     }
   }
+
+  describe("a block default with its own var (#3065)") {
+    it("assigns the var and passes the result") {
+      val result = run(
+        """
+          |class Test {
+          |public:
+          |  static def t(n: Int = { var a = 0
+          |    a = 5
+          |    a += 1
+          |    a }): Int = n
+          |  static def main(args: String[]): String = t() + "," + t(2)
+          |}
+        """)
+      assert(Shell.Success("6,2") == result)
+    }
+  }
 }

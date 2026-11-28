@@ -906,7 +906,7 @@ private[compiler] final class MethodBodySupport(
     val context = new LocalContext
     if isStatic then context.setStatic(true)
     context.setMethod(method)
-    context.setReassignedNames(Set.empty)
+    context.setReassignedNames(bodyContext.assignedNames(expr))
     args.take(i).zip(prefixTypes).foreach { (a, t) => context.add(a.name, t, isMutable = false) }
     context.laterParameterNames = args.drop(i).map(_.name).toSet
     val triesBefore = bodyContext.tryCount
